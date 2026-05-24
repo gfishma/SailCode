@@ -52,6 +52,52 @@ scmd_errCode_def scmd_switch(char* pData, unsigned short len)
 	return scmd_analyze(&scmd_ctrler, pData, len);
 }
 
+/* 默认初始化：I2C1=输入(0x59), I2C2=输出(0x59)，上电自动配置 */
+void scmd_switch_init_default(void)
+{
+	unsigned char i;
+
+	/* input mux on I2C1, addr 0x59 */
+	sm_instance.input_mux.i2c.bus = &i2c_bus_list[0];
+	sm_instance.input_mux.i2c.addr_wide = i2c_8bit_mode;
+	sm_instance.input_mux.addr = 0x59;
+
+	/* output mux on I2C2, addr 0x59 */
+	sm_instance.output_mux.i2c.bus = &i2c_bus_list[1];
+	sm_instance.output_mux.i2c.addr_wide = i2c_8bit_mode;
+	sm_instance.output_mux.addr = 0x59;
+
+	/* input chips: 25 个 ADG2128，分布在 PCA9847 CH1-CH4 */
+	sm_instance.input_chip_count = 25;
+	for (i = 0; i < sm_instance.input_chip_count; i++)
+	{
+		sm_instance.input_chips[i].i2c.bus = &i2c_bus_list[0];
+		sm_instance.input_chips[i].i2c.addr_wide = i2c_8bit_mode;
+		sm_instance.input_chips[i].id = (unsigned char)(i % 8);
+
+		if (i < 8)
+			sm_instance.input_chip_mux_ch[i] = 1;
+		else if (i < 16)
+			sm_instance.input_chip_mux_ch[i] = 2;
+		else if (i < 24)
+			sm_instance.input_chip_mux_ch[i] = 3;
+		else
+			sm_instance.input_chip_mux_ch[i] = 4;
+	}
+
+	/* output chips: 4 个 ADG2128，在 PCA9847 CH4 */
+	sm_instance.output_chip_count = 4;
+	for (i = 0; i < sm_instance.output_chip_count; i++)
+	{
+		sm_instance.output_chips[i].i2c.bus = &i2c_bus_list[1];
+		sm_instance.output_chips[i].i2c.addr_wide = i2c_8bit_mode;
+		sm_instance.output_chips[i].id = (unsigned char)i;
+		sm_instance.output_chip_mux_ch[i] = 4;
+	}
+
+	switch_matrix_init(&sm_instance);
+}
+
 static scmd_errCode_def __help(char *pData, unsigned short len)
 {
 	scmd_ctrler.msgSource = scmd_ctrl.msgSource;

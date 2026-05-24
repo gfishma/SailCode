@@ -19,6 +19,7 @@
 
 #include "scmd.h"
 #include "scmd_dvm.h"
+#include "scmd_switch.h"
 #include "w25qxx.h"
 
 #include "Module_DVM_V2.h"
@@ -193,6 +194,7 @@ void bsp_init()
 	scmd_init(&scmd_ctrl);
 	// DVM_V2_Init(&DVM_V2);
 	DVM_config();
+	scmd_switch_init_default();
 	ntc_init(&ntc_1, 10000, 3976);
 
 	printf("follow the write rabbit.\r\n");
