@@ -33,7 +33,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __help,   .name = "help",   .dest = ">switch help",                                   .isVisible = 1,},
 	{.func = __info,   .name = "info",   .dest = ">switch info",                                   .isVisible = 1,},
 	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 1,},
-	{.func = __set,    .name = "set",    .dest = ">switch set(X, Y, O, 1) // X:1-300 Y:1-8 O:1-48, 1=ON 0=OFF", .isVisible = 1,},
+	{.func = __set,    .name = "set",    .dest = ">switch set(X1, Y2, T13, ON/OFF) // X:1-300 Y:1-8 T:1-48, or set(1,2,13,ON)", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan(mux_addr) // scan all CH and ADG2128",.isVisible = 1,},
 };
@@ -241,7 +241,7 @@ static scmd_errCode_def __config(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-/* switch set(X, Y, O, 1/0) */
+/* switch set(X, Y, O, ON/OFF) */
 static scmd_errCode_def __set(char *pData, unsigned short len)
 {
 	char *pNet = pData;
@@ -265,33 +265,70 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	if (sm_instance.input_mux.i2c.bus == NULL)
 		return __scmd_ErrMsg("<switch set(error), not configured. Use 'switch config' first.\r\n");
 
-	/* skip '(' and parse X -- first param has no leading comma */
+#define SKIP_LETTER(p)  if (((*(p) >= 'A') && (*(p) <= 'Z')) || ((*(p) >= 'a') && (*(p) <= 'z'))) (p) += 1
+
+	/* skip '(' and parse X */
 	pNet = strstr(pNet, "(");
 	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), '(' not found.\r\n");
 	pNet += 1;
 
+	SKIP_LETTER(pNet);
 	pNet = str_GetHexDec(pNet, pEnd, &x_val);
 	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), X not found.\r\n");
 	if (x_val < 1 || x_val > SM_INPUT_TOTAL)
 		return __scmd_ErrMsg("<switch set(error), X over range (1-300).\r\n");
 
 	/* parse Y */
-	pNet = __scmd_getValidData(pNet, pEnd, ",", &y_val);
-	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), Y not found.\r\n");
+	{
+		pNet = (char*)strstr(pNet, ",");
+		if (pNet == NULL || pNet >= pEnd)
+			return __scmd_ErrMsg("<switch set(error), ',' not found before Y.\r\n");
+		pNet += 1;
+		SKIP_LETTER(pNet);
+		pNet = str_GetHexDec(pNet, pEnd, &y_val);
+		if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), Y not found.\r\n");
+	}
 	if (y_val < 1 || y_val > SM_Y_QTY)
 		return __scmd_ErrMsg("<switch set(error), Y over range (1-8).\r\n");
 
-	/* parse O */
-	pNet = __scmd_getValidData(pNet, pEnd, ",", &o_val);
-	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), O not found.\r\n");
+	/* parse O/T */
+	{
+		pNet = (char*)strstr(pNet, ",");
+		if (pNet == NULL || pNet >= pEnd)
+			return __scmd_ErrMsg("<switch set(error), ',' not found before O.\r\n");
+		pNet += 1;
+		SKIP_LETTER(pNet);
+		pNet = str_GetHexDec(pNet, pEnd, &o_val);
+		if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), O not found.\r\n");
+	}
 	if (o_val < 1 || o_val > SM_OUTPUT_TOTAL)
 		return __scmd_ErrMsg("<switch set(error), O over range (1-48).\r\n");
 
+#undef SKIP_LETTER
+
 	/* parse ON/OFF */
-	pNet = __scmd_getValidData(pNet, pEnd, ",", &on_off);
-	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), ON/OFF not found.\r\n");
-	if (on_off != 0 && on_off != 1)
-		return __scmd_ErrMsg("<switch set(error), ON/OFF must be 0 or 1.\r\n");
+	{
+		/* skip leading ',' */
+		pNet = (char*)strstr(pNet, ",");
+		if (pNet == NULL || pNet >= pEnd)
+			return __scmd_ErrMsg("<switch set(error), ',' not found before ON/OFF.\r\n");
+		pNet += 1;
+		str_deSpace(pNet);
+
+		if (((pNet[0] == 'O' || pNet[0] == 'o') && (pNet[1] == 'N' || pNet[1] == 'n')))
+		{
+			on_off = 1;
+		}
+		else if (((pNet[0] == 'O' || pNet[0] == 'o') && (pNet[1] == 'F' || pNet[1] == 'f') &&
+				  (pNet[2] == 'F' || pNet[2] == 'f')))
+		{
+			on_off = 0;
+		}
+		else
+		{
+			return __scmd_ErrMsg("<switch set(error), ON/OFF must be 'ON' or 'OFF'.\r\n");
+		}
+	}
 
 	if (switch_matrix_connect(&sm_instance,
 		(unsigned short)x_val, (unsigned char)y_val,
