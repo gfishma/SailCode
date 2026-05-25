@@ -16,6 +16,7 @@
 #include "scmd_dvm.h"
 #include "scmd_w25qxx.h"
 #include "scmd_switch.h"
+#include "scmd_emio.h"
 
 extern gpio_class led;
 
@@ -36,6 +37,7 @@ scmd_cmd_def scmd_list[] =
 		{.func = scmd_capture,	.name = "capture",	.dest = ">capture help",	.isVisible = 1,},
 		{.func = scmd_dvm,		.name = "dvm",		.dest = ">dvm help",		.isVisible = 1,},
 		{.func = scmd_switch,	.name = "switch",	.dest = ">switch help",		.isVisible = 1,},
+		{.func = scmd_emio,		.name = "em_io",	.dest = ">em_io help",		.isVisible = 1,},
 	//		{.func = scmd_w25qxx,	.name = "w25qxx",	.dest = ">w25qxx help",		.isVisible = 1,},
 };
 
