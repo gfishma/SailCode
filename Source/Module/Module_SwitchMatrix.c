@@ -2,9 +2,35 @@
  * Module_SwitchMatrix.c
  *
  * ADG2128 N*8*M Switch Matrix module
+ *
+ * PCB wiring remap (per 96-channel block, alternating):
+ *   Group A (even blocks): X5 X4 X3 X2 X1 X0 | X11 X10 X9 X8 X7 X6
+ *   Group B (odd  blocks): X6 X7 X8 X9 X10 X11 | X0 X1 X2 X3 X4 X5
  */
 
 #include "Module_SwitchMatrix.h"
+
+static unsigned char sw_remap_x(unsigned short ch, unsigned char in_x)
+{
+	unsigned short block = ch / 96;
+
+	if ((block & 1) == 0)
+	{
+		/* Group A: descending within each half */
+		if (in_x <= 5)
+			return 5 - in_x;
+		else
+			return 17 - in_x;
+	}
+	else
+	{
+		/* Group B: ascending, halves swapped */
+		if (in_x <= 5)
+			return in_x + 6;
+		else
+			return in_x - 6;
+	}
+}
 
 int switch_matrix_init(switch_matrix_class* self)
 {
@@ -55,7 +81,7 @@ int switch_matrix_connect(switch_matrix_class* self,
 	o_ch -= 1;
 
 	in_chip = (unsigned char)(x_ch / SM_X_PER_CHIP);
-	in_x    = (unsigned char)(x_ch % SM_X_PER_CHIP);
+	in_x    = sw_remap_x(x_ch, (unsigned char)(x_ch % SM_X_PER_CHIP));
 
 	out_chip = (unsigned char)(o_ch / SM_X_PER_CHIP);
 	out_x    = (unsigned char)(o_ch % SM_X_PER_CHIP);
