@@ -105,3 +105,31 @@ int switch_matrix_connect(switch_matrix_class* self,
 
 	return 0;
 }
+
+int switch_matrix_connect_yf(switch_matrix_class* self,
+	unsigned char y_ch, unsigned short f_ch, unsigned char on)
+{
+	unsigned char out_chip, out_x;
+	unsigned char mux_ch;
+	int ret;
+
+	if (y_ch == 0 || y_ch > SM_Y_QTY)       return -1;
+	if (f_ch == 0 || f_ch > SM_OUTPUT_TOTAL) return -2;
+
+	y_ch -= 1;
+	f_ch -= 1;
+
+	out_chip = (unsigned char)(f_ch / SM_X_PER_CHIP);
+	out_x    = (unsigned char)(f_ch % SM_X_PER_CHIP);
+
+	if (out_chip >= self->output_chip_count) return -3;
+
+	/* output side only */
+	mux_ch = self->output_chip_mux_ch[out_chip];
+	ret = pca9847_select_channel(&self->output_mux, mux_ch);
+	if (ret != 0) return -4;
+	ret = adg2128_set_switch(&self->output_chips[out_chip], out_x, y_ch, on);
+	if (ret != 0) return -5;
+
+	return 0;
+}

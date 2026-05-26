@@ -4,6 +4,7 @@
  * ADG2128 Switch Matrix serial command handler
  * Command format:
  *   switch set(X, Y, O, 1/0)  -- 1=ON(connect), 0=OFF(disconnect)
+ *   switch yf set(Y, F, ON/OFF) -- only connect Y→F, no input switching
  *   switch reset               -- turn off all switches
  *   switch config(i2c_1, 0x59, i2c_2, 0x59)
  *   switch info                -- show current configuration
@@ -25,6 +26,8 @@ static scmd_errCode_def __config(char* pData, unsigned short len);
 static scmd_errCode_def __set(char* pData, unsigned short len);
 static scmd_errCode_def __reset(char* pData, unsigned short len);
 static scmd_errCode_def __scan(char* pData, unsigned short len);
+static scmd_errCode_def __yf(char* pData, unsigned short len);
+static scmd_errCode_def __yf_set(char* pData, unsigned short len);
 
 static switch_matrix_class sm_instance;
 
@@ -36,6 +39,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __set,    .name = "set",    .dest = ">switch set(X1, Y2, T13, ON/OFF) // X:1-300 Y:1-8 T:1-48, or set(1,2,13,ON)", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan(mux_addr) // scan all CH and ADG2128",.isVisible = 1,},
+	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1, F2, ON/OFF) // Y:1-8 F:1-48", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -425,6 +429,109 @@ static scmd_errCode_def __scan(char *pData, unsigned short len)
 			if (!found) slen += sprintf(scmd_msgBuf + slen, "(none)");
 		}
 		slen += sprintf(scmd_msgBuf + slen, "\r\n");
+	}
+
+	scmd_callback(scmd_msgBuf, slen);
+	return scmd_normal;
+}
+
+/* switch yf set(Y, F, ON/OFF) — only connect Y→F, no input switching */
+static scmd_errCode_def __yf(char *pData, unsigned short len)
+{
+	str_deSpace(pData);
+
+	if (len >= 3 && (pData[0] == 's' || pData[0] == 'S') &&
+		(pData[1] == 'e' || pData[1] == 'E') &&
+		(pData[2] == 't' || pData[2] == 'T'))
+	{
+		return __yf_set(pData + 3, len - 3);
+	}
+
+	return __scmd_ErrMsg("<switch yf(error), unknown sub-command. Use: yf set(Y,F,ON/OFF)\r\n");
+}
+
+static scmd_errCode_def __yf_set(char *pData, unsigned short len)
+{
+	char *pNet = pData;
+	char *pEnd = pData + len;
+	unsigned short qty = 1;
+	unsigned short slen = 0;
+
+	long y_val = 0;
+	long f_val = 0;
+	long on_off = 0;
+
+	str_deSpace(pData);
+
+	pEnd = strstr(pNet, ")");
+	if (pEnd == NULL) return __scmd_ErrMsg("<switch yf set(error), ')' not found.\r\n");
+
+	qty += str_CharQty(pNet, ',');
+	if (qty != 3) return __scmd_ErrMsg("<switch yf set(error), need 3 parameters: Y, F, ON/OFF.\r\n");
+
+	if (sm_instance.input_mux.i2c.bus == NULL)
+		return __scmd_ErrMsg("<switch yf set(error), not configured. Use 'switch config' first.\r\n");
+
+#define SKIP_LETTER(p)  if (((*(p) >= 'A') && (*(p) <= 'Z')) || ((*(p) >= 'a') && (*(p) <= 'z'))) (p) += 1
+
+	/* skip '(' and parse Y */
+	pNet = strstr(pNet, "(");
+	if (pNet == NULL) return __scmd_ErrMsg("<switch yf set(error), '(' not found.\r\n");
+	pNet += 1;
+
+	SKIP_LETTER(pNet);
+	pNet = str_GetHexDec(pNet, pEnd, &y_val);
+	if (pNet == NULL) return __scmd_ErrMsg("<switch yf set(error), Y not found.\r\n");
+	if (y_val < 1 || y_val > SM_Y_QTY)
+		return __scmd_ErrMsg("<switch yf set(error), Y over range (1-8).\r\n");
+
+	/* parse F */
+	{
+		pNet = (char*)strstr(pNet, ",");
+		if (pNet == NULL || pNet >= pEnd)
+			return __scmd_ErrMsg("<switch yf set(error), ',' not found before F.\r\n");
+		pNet += 1;
+		SKIP_LETTER(pNet);
+		pNet = str_GetHexDec(pNet, pEnd, &f_val);
+		if (pNet == NULL) return __scmd_ErrMsg("<switch yf set(error), F not found.\r\n");
+	}
+	if (f_val < 1 || f_val > SM_OUTPUT_TOTAL)
+		return __scmd_ErrMsg("<switch yf set(error), F over range (1-48).\r\n");
+
+#undef SKIP_LETTER
+
+	/* parse ON/OFF */
+	{
+		pNet = (char*)strstr(pNet, ",");
+		if (pNet == NULL || pNet >= pEnd)
+			return __scmd_ErrMsg("<switch yf set(error), ',' not found before ON/OFF.\r\n");
+		pNet += 1;
+		str_deSpace(pNet);
+
+		if (((pNet[0] == 'O' || pNet[0] == 'o') && (pNet[1] == 'N' || pNet[1] == 'n')))
+		{
+			on_off = 1;
+		}
+		else if (((pNet[0] == 'O' || pNet[0] == 'o') && (pNet[1] == 'F' || pNet[1] == 'f') &&
+				  (pNet[2] == 'F' || pNet[2] == 'f')))
+		{
+			on_off = 0;
+		}
+		else
+		{
+			return __scmd_ErrMsg("<switch yf set(error), ON/OFF must be 'ON' or 'OFF'.\r\n");
+		}
+	}
+
+	if (switch_matrix_connect_yf(&sm_instance,
+		(unsigned char)y_val, (unsigned short)f_val, (unsigned char)on_off) != 0)
+	{
+		slen += sprintf(scmd_msgBuf + slen, "<switch yf set(error)\r\n");
+	}
+	else
+	{
+		slen += sprintf(scmd_msgBuf + slen, "<switch yf set(ok) Y%d-F%d %s\r\n",
+			(int)y_val, (int)f_val, (on_off ? "ON" : "OFF"));
 	}
 
 	scmd_callback(scmd_msgBuf, slen);

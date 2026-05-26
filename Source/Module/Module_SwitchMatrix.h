@@ -33,5 +33,7 @@ typedef struct __switch_matrix_class
 int switch_matrix_init(switch_matrix_class* self);
 int switch_matrix_connect(switch_matrix_class* self,
 	unsigned short x_ch, unsigned char y_ch, unsigned short o_ch, unsigned char on);
+int switch_matrix_connect_yf(switch_matrix_class* self,
+	unsigned char y_ch, unsigned short f_ch, unsigned char on);
 
 #endif /* MODULE_MODULE_SWITCHMATRIX_H_ */
