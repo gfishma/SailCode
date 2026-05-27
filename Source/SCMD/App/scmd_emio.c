@@ -48,23 +48,15 @@ scmd_errCode_def scmd_emio(char* pData, unsigned short len)
 
 void scmd_emio_init_default(void)
 {
-	int ret = emio_init(&emio_instance);
-	if (ret == 0)
-		printf("em_io init ok (6/6)\r\n");
-	else
-		printf("em_io init warning: %d chip(s) failed\r\n", ret);
+	emio_init(&emio_instance);
 }
 
 static scmd_errCode_def __init(char *pData, unsigned short len)
 {
-	int ret = emio_init(&emio_instance);
+	emio_init(&emio_instance);
+
 	unsigned short slen = 0;
-
-	if (ret == 0)
-		slen += sprintf(scmd_msgBuf + slen, "<em_io init(ok) 6/6 chips\r\n");
-	else
-		slen += sprintf(scmd_msgBuf + slen, "<em_io init(warn) %d chip(s) failed\r\n", ret);
-
+	slen += sprintf(scmd_msgBuf + slen, "<em_io init(ok)\r\n");
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }

@@ -223,20 +223,8 @@ static scmd_errCode_def __config(char *pData, unsigned short len)
 
 	{
 		int init_ret = switch_matrix_init(&sm_instance);
-		if (init_ret == -1)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), I2C1 PCA9847 init failed.\r\n");
-		else if (init_ret == -2)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), I2C2 PCA9847 init failed.\r\n");
-		else if (init_ret == -3)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), I2C1 PCA9847 CH select failed.\r\n");
-		else if (init_ret == -4)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), I2C1 ADG2128 init failed (chip0, addr=0x70).\r\n");
-		else if (init_ret == -5)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), I2C2 PCA9847 CH select failed.\r\n");
-		else if (init_ret == -6)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), I2C2 ADG2128 init failed (chip0, addr=0x70).\r\n");
-		else if (init_ret != 0)
-			slen += sprintf(scmd_msgBuf + slen, "<switch config(error), init failed code=%d.\r\n", init_ret);
+		if (init_ret != 0)
+			slen += sprintf(scmd_msgBuf + slen, "<switch config(error) code=%d\r\n", init_ret);
 		else
 			slen += sprintf(scmd_msgBuf + slen, "<switch config(ok)\r\n");
 	}
