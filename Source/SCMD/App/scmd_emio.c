@@ -29,7 +29,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __help, .name = "help", .dest = ">em_io help",                              .isVisible = 1,},
 	{.func = __info, .name = "info", .dest = ">em_io info",                              .isVisible = 1,},
 	{.func = __init, .name = "init", .dest = ">em_io init",                              .isVisible = 1,},
-	{.func = __set,  .name = "set",  .dest = ">em_io set(io, 0/1) or set([io, lv], ...)", .isVisible = 1,},
+	{.func = __set,  .name = "set",  .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
