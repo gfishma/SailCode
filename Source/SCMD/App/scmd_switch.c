@@ -36,7 +36,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __help,   .name = "help",   .dest = ">switch help",                                   .isVisible = 1,},
 	{.func = __info,   .name = "info",   .dest = ">switch info",                                   .isVisible = 1,},
 	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 1,},
-	{.func = __set,    .name = "set",    .dest = ">switch set(X1, Y2, T13, ON/OFF) // X:1-300 Y:1-8 T:1-48, or set(1,2,13,ON)", .isVisible = 1,},
+	{.func = __set,    .name = "set",    .dest = ">switch set(X1, Y2, T13, ON/OFF) // X:1-300 Y:1-8 T:1-48", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan(mux_addr) // scan all CH and ADG2128",.isVisible = 1,},
 	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1, F2, ON/OFF) // Y:1-8 F:1-48", .isVisible = 1,},
@@ -257,16 +257,16 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	if (sm_instance.input_mux.i2c.bus == NULL)
 		return __scmd_ErrMsg("<switch set(error), not configured. Use 'switch config' first.\r\n");
 
-#define SKIP_LETTER(p)  if (((*(p) >= 'A') && (*(p) <= 'Z')) || ((*(p) >= 'a') && (*(p) <= 'z'))) (p) += 1
-
 	/* skip '(' and parse X */
 	pNet = strstr(pNet, "(");
 	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), '(' not found.\r\n");
 	pNet += 1;
 
-	SKIP_LETTER(pNet);
+	if (*pNet != 'X' && *pNet != 'x')
+		return __scmd_ErrMsg("<switch set(error), expected 'X' prefix.\r\n");
+	pNet++;
 	pNet = str_GetHexDec(pNet, pEnd, &x_val);
-	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), X not found.\r\n");
+	if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), X value not found.\r\n");
 	if (x_val < 1 || x_val > SM_INPUT_TOTAL)
 		return __scmd_ErrMsg("<switch set(error), X over range (1-300).\r\n");
 
@@ -276,27 +276,29 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 		if (pNet == NULL || pNet >= pEnd)
 			return __scmd_ErrMsg("<switch set(error), ',' not found before Y.\r\n");
 		pNet += 1;
-		SKIP_LETTER(pNet);
+		if (*pNet != 'Y' && *pNet != 'y')
+			return __scmd_ErrMsg("<switch set(error), expected 'Y' prefix.\r\n");
+		pNet++;
 		pNet = str_GetHexDec(pNet, pEnd, &y_val);
-		if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), Y not found.\r\n");
+		if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), Y value not found.\r\n");
 	}
 	if (y_val < 1 || y_val > SM_Y_QTY)
 		return __scmd_ErrMsg("<switch set(error), Y over range (1-8).\r\n");
 
-	/* parse O/T */
+	/* parse T */
 	{
 		pNet = (char*)strstr(pNet, ",");
 		if (pNet == NULL || pNet >= pEnd)
-			return __scmd_ErrMsg("<switch set(error), ',' not found before O.\r\n");
+			return __scmd_ErrMsg("<switch set(error), ',' not found before T.\r\n");
 		pNet += 1;
-		SKIP_LETTER(pNet);
+		if (*pNet != 'T' && *pNet != 't')
+			return __scmd_ErrMsg("<switch set(error), expected 'T' prefix.\r\n");
+		pNet++;
 		pNet = str_GetHexDec(pNet, pEnd, &o_val);
-		if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), O not found.\r\n");
+		if (pNet == NULL) return __scmd_ErrMsg("<switch set(error), T value not found.\r\n");
 	}
 	if (o_val < 1 || o_val > SM_OUTPUT_TOTAL)
-		return __scmd_ErrMsg("<switch set(error), O over range (1-48).\r\n");
-
-#undef SKIP_LETTER
+		return __scmd_ErrMsg("<switch set(error), T over range (1-48).\r\n");
 
 	/* parse ON/OFF */
 	{
@@ -330,7 +332,7 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	}
 	else
 	{
-		slen += sprintf(scmd_msgBuf + slen, "<switch set(ok) X%d-Y%d-O%d %s\r\n",
+		slen += sprintf(scmd_msgBuf + slen, "<switch set(ok) X%d-Y%d-T%d %s\r\n",
 			(int)x_val, (int)y_val, (int)o_val, (on_off ? "ON" : "OFF"));
 	}
 
