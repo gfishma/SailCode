@@ -67,6 +67,39 @@ int emio_init(emio_class* self)
 	return err_count;
 }
 
+int emio_reset(emio_class* self)
+{
+	static const unsigned short chip_default[EMIO_CHIP_COUNT] = {
+		0x0480,  /* Chip 0 (IO  1-16): IO8 bit7, IO11 bit10 */
+		0x1004,  /* Chip 1 (IO 17-32): IO19 bit2, IO29 bit12 */
+		0x0000,  /* Chip 2 (IO 33-48): all 0 */
+		0x0000,  /* Chip 3 (IO 49-64): all 0 */
+		0x0A00,  /* Chip 4 (IO 65-80): IO74 bit9, IO76 bit11 */
+		0x0000,  /* Chip 5 (IO 81-96): all 0 */
+	};
+	unsigned char i;
+	int ret;
+
+	for (i = 0; i < EMIO_CHIP_COUNT; i++)
+	{
+		if (i < 3)
+			ret = pca9847_select_channel(&self->mux_i2c2, 6);
+		else
+			ret = pca9847_select_channel(&self->mux_i2c1, 0);
+		if (ret != 0)
+			continue;
+
+		self->chip[i].out_data = chip_default[i];
+		cat9555_set_pin_inHex(&self->chip[i], chip_default[i]);
+		cat9555_cfg_pin_dir_inHex(&self->chip[i], 0x0000);
+	}
+
+	pca9847_disable_all(&self->mux_i2c1);
+	pca9847_disable_all(&self->mux_i2c2);
+
+	return 0;
+}
+
 int emio_set_io(emio_class* self, unsigned char io_num, unsigned char level)
 {
 	unsigned char chip_idx;

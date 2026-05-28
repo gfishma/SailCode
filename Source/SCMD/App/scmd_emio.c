@@ -21,6 +21,7 @@ static scmd_errCode_def __help(char *pData, unsigned short len);
 static scmd_errCode_def __info(char *pData, unsigned short len);
 static scmd_errCode_def __set(char* pData, unsigned short len);
 static scmd_errCode_def __init(char* pData, unsigned short len);
+static scmd_errCode_def __reset(char* pData, unsigned short len);
 
 static emio_class emio_instance;
 
@@ -28,8 +29,9 @@ static scmd_cmd_def scmd_func[] =
 {
 	{.func = __help, .name = "help", .dest = ">em_io help",                              .isVisible = 1,},
 	{.func = __info, .name = "info", .dest = ">em_io info",                              .isVisible = 1,},
-	{.func = __init, .name = "init", .dest = ">em_io init",                              .isVisible = 1,},
-	{.func = __set,  .name = "set",  .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
+	{.func = __init,  .name = "init",  .dest = ">em_io init",                              .isVisible = 1,},
+	{.func = __reset, .name = "reset", .dest = ">em_io reset",                             .isVisible = 1,},
+	{.func = __set,   .name = "set",   .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -49,11 +51,13 @@ scmd_errCode_def scmd_emio(char* pData, unsigned short len)
 void scmd_emio_init_default(void)
 {
 	emio_init(&emio_instance);
+	emio_reset(&emio_instance);
 }
 
 static scmd_errCode_def __init(char *pData, unsigned short len)
 {
 	emio_init(&emio_instance);
+	emio_reset(&emio_instance);
 
 	unsigned short slen = 0;
 	slen += sprintf(scmd_msgBuf + slen, "<em_io init(ok)\r\n");
@@ -213,6 +217,16 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	}
 
 	slen += sprintf(scmd_msgBuf + slen, "<em_io set(ok) %d IO(s)\r\n", count);
+	scmd_callback(scmd_msgBuf, slen);
+	return scmd_normal;
+}
+
+static scmd_errCode_def __reset(char *pData, unsigned short len)
+{
+	emio_reset(&emio_instance);
+
+	unsigned short slen = 0;
+	slen += sprintf(scmd_msgBuf + slen, "<em_io reset(ok) IO[74,76,8,19,29,11]=1 others=0\r\n");
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }

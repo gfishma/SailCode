@@ -24,6 +24,7 @@ typedef struct __emio_class
 } emio_class;
 
 int emio_init(emio_class* self);
+int emio_reset(emio_class* self);
 int emio_set_io(emio_class* self, unsigned char io_num, unsigned char level);
 
 #endif /* __MODULE_EMIO_H_ */
