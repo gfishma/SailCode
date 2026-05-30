@@ -107,3 +107,70 @@ int dac5667_set_voltage(dac5667_module_class* self, dac5667_path_def path, float
 
 	return ret;
 }
+
+/*
+ * CCS current source: auto-select range, set MUX and DAC A.
+ * current_ma > 0 → positive CCS (S1), < 0 → negative CCS (S2).
+ */
+int dac5667_set_current(dac5667_module_class* self, float current_ma)
+{
+	static const float range_r[4] = {
+		DAC5667_CCS_R_100R,
+		DAC5667_CCS_R_499R,
+		DAC5667_CCS_R_10K,
+		DAC5667_CCS_R_1M,
+	};
+	float i_abs, v_dac;
+	unsigned char mux_ch;
+	unsigned char range;
+	unsigned short code;
+	int ret;
+	int i;
+
+	if (!self->io_chip0)
+		return -1;
+
+	i_abs = (current_ma < 0.0f) ? -current_ma : current_ma;
+
+	/* auto-select range: highest R where |I| * R <= 5.0V */
+	range = DAC5667_CCS_RANGE_1M;
+	for (i = 3; i >= 0; i--)
+	{
+		v_dac = (i_abs / 1000.0f) * range_r[i];
+		if (v_dac <= 5.0f)
+		{
+			range = (unsigned char)i;
+			break;
+		}
+	}
+
+	v_dac = (i_abs / 1000.0f) * range_r[range];
+	if (v_dac > 5.0f) v_dac = 5.0f;
+	code = (unsigned short)((v_dac / 5.0f) * (float)AD5667_MAX_CODE);
+	if (code > AD5667_MAX_CODE) code = AD5667_MAX_CODE;
+
+	/* MUX channel: S1(0) for positive, S2(1) for negative */
+	mux_ch = (current_ma >= 0.0f) ? DAC5667_CCS_MUX_POS : DAC5667_CCS_MUX_NEG;
+
+	/* select CH7 for CAT9555 chip0 */
+	ret = pca9847_select_channel(&self->mux, DAC5667_EMIO_MUX_CH);
+	if (ret != 0) return -2;
+
+	/* disable MUX first, then configure IOs */
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, 0);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, range & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, (range >> 1) & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, mux_ch & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO4_PIN, (mux_ch >> 1) & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, 1);
+
+	/* switch to CH2 and set DAC A */
+	ret = pca9847_select_channel(&self->mux, DAC5667_DAC_MUX_CH);
+	if (ret != 0) return -3;
+
+	ret = ad5667_set_dac_a(&self->dac, code);
+
+	pca9847_disable_all(&self->mux);
+
+	return ret;
+}

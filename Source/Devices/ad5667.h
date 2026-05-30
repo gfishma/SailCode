@@ -12,6 +12,7 @@
 #define AD5667_FIXED_ID         0x0C
 
 /* Command byte format: [C3 C2 C1 C0 A1 A0 X X] */
+#define AD5667_CMD_WRITE_UPDATE_DAC_A   0x31   /* 0011 00 01: write+update DAC A */
 #define AD5667_CMD_WRITE_UPDATE_DAC_B   0x34   /* 0011 01 00: write+update DAC B */
 
 /* Output range: 0 to 2*Vref = 0 to 5V, 16-bit */
@@ -22,10 +23,12 @@
 typedef struct __ad5667_class
 {
 	i2c_dev_class       i2c;
+	unsigned short      dac_a_code;
 	unsigned short      dac_b_code;
 } ad5667_class;
 
 int ad5667_init(ad5667_class* self);
+int ad5667_set_dac_a(ad5667_class* self, unsigned short code);
 int ad5667_set_dac_b(ad5667_class* self, unsigned short code);
 
 #endif /* __AD5667_H_ */
