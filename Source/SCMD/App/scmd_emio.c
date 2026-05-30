@@ -23,7 +23,7 @@ static scmd_errCode_def __set(char* pData, unsigned short len);
 static scmd_errCode_def __init(char* pData, unsigned short len);
 static scmd_errCode_def __reset(char* pData, unsigned short len);
 
-static emio_class emio_instance;
+emio_class emio_instance;
 
 static scmd_cmd_def scmd_func[] =
 {

@@ -8,6 +8,9 @@
 #define SCMD_APP_SCMD_EMIO_H_
 
 #include "scmd.h"
+#include "Module_EMIO.h"
+
+extern emio_class emio_instance;
 
 scmd_errCode_def scmd_emio(char* pData, unsigned short len);
 void scmd_emio_init_default(void);
