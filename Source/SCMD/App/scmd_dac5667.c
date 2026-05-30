@@ -3,9 +3,9 @@
  *
  * DAC5667 serial command handler
  * Command format:
- *   dac5667 set(V, 2.5)    -- normal 0~5V
- *   dac5667 set(A, 10.0)   -- amplified 0~35V
- *   dac5667 set(N, 3.0)    -- negative 0~-5V
+ *   dac5667 cvs set(V, 2.5)    -- normal 0~5V
+ *   dac5667 cvs set(A, 10.0)   -- amplified 0~35V
+ *   dac5667 cvs set(N, 3.0)    -- negative 0~-5V
  *   dac5667 ccs set(1.5)   -- CCS current (mA, sign=polarity)
  *   dac5667 info           -- show configuration
  *   dac5667 help           -- show help
@@ -22,7 +22,8 @@ extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
 
 static scmd_errCode_def __help(char *pData, unsigned short len);
 static scmd_errCode_def __info(char *pData, unsigned short len);
-static scmd_errCode_def __set(char* pData, unsigned short len);
+static scmd_errCode_def __cvs(char* pData, unsigned short len);
+static scmd_errCode_def __cvs_set(char* pData, unsigned short len);
 static scmd_errCode_def __ccs(char* pData, unsigned short len);
 static scmd_errCode_def __ccs_set(char* pData, unsigned short len);
 
@@ -32,7 +33,7 @@ static scmd_cmd_def scmd_func[] =
 {
 	{.func = __help, .name = "help", .dest = ">dac5667 help",                                       .isVisible = 1,},
 	{.func = __info, .name = "info", .dest = ">dac5667 info",                                       .isVisible = 1,},
-	{.func = __set,  .name = "set",  .dest = ">dac5667 set(V/A/N, voltage)  V:0-5V A:0-35V N:0~-5V", .isVisible = 1,},
+	{.func = __cvs,  .name = "cvs",  .dest = ">dac5667 cvs set(V/A/N, voltage)  V:0-5V A:0-35V N:0~-5V", .isVisible = 1,},
 	{.func = __ccs,  .name = "ccs",  .dest = ">dac5667 ccs set(current_mA)  sign=polarity",              .isVisible = 1,},
 };
 
@@ -101,7 +102,18 @@ static const char* mode_name(dac5667_path_def path)
 	}
 }
 
-static scmd_errCode_def __set(char *pData, unsigned short len)
+static scmd_errCode_def __cvs(char *pData, unsigned short len)
+{
+	str_deSpace(pData);
+	if (strncmp(pData, "set", 3) == 0)
+	{
+		pData += 3;
+		return __cvs_set(pData, len);
+	}
+	return __scmd_ErrMsg("<dac5667 cvs(error) unknown sub, use: cvs set(V/A/N, voltage)\r\n");
+}
+
+static scmd_errCode_def __cvs_set(char *pData, unsigned short len)
 {
 	char *pNet = pData;
 	char *pEnd;
@@ -116,56 +128,55 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	/* find ')' */
 	pEnd = strstr(pNet, ")");
 	if (pEnd == NULL)
-		return __scmd_ErrMsg("<dac5667 set(error), ')' not found.\r\n");
+		return __scmd_ErrMsg("<dac5667 cvs set(error), ')' not found.\r\n");
 
 	/* skip '(' */
 	pNet = strstr(pNet, "(");
 	if (pNet == NULL)
-		return __scmd_ErrMsg("<dac5667 set(error), '(' not found.\r\n");
+		return __scmd_ErrMsg("<dac5667 cvs set(error), '(' not found.\r\n");
 	pNet += 1;
 
 	str_deSpace(pNet);
 
 	/* parse mode char */
 	if (*pNet == '\0' || pNet >= pEnd)
-		return __scmd_ErrMsg("<dac5667 set(error), mode not found.\r\n");
+		return __scmd_ErrMsg("<dac5667 cvs set(error), mode not found.\r\n");
 
 	mode = parse_mode(*pNet);
 	if ((int)mode < 0)
-		return __scmd_ErrMsg("<dac5667 set(error), invalid mode, use V/A/N.\r\n");
+		return __scmd_ErrMsg("<dac5667 cvs set(error), invalid mode, use V/A/N.\r\n");
 	pNet += 1;
 
 	/* skip ',' */
 	pComma = (char*)strstr(pNet, ",");
 	if (pComma == NULL || pComma >= pEnd)
-		return __scmd_ErrMsg("<dac5667 set(error), ',' not found.\r\n");
+		return __scmd_ErrMsg("<dac5667 cvs set(error), ',' not found.\r\n");
 	pNet = pComma + 1;
 
 	str_deSpace(pNet);
 
 	/* parse voltage */
 	voltage = (float)strtod(pNet, &pEnd);
-	/* note: pEnd may differ from ')' pEnd — that's fine, str_deSpace strips whitespace */
 
 	/* call module */
 	ret = dac5667_set_voltage(&dac5667_module, mode, voltage);
 	if (ret == -20)
 	{
 		slen += sprintf(scmd_msgBuf + slen,
-			"<dac5667 set(error) path mismatch, check IO7/IO33 state.\r\n");
+			"<dac5667 cvs set(error) path mismatch, check IO7/IO33 state.\r\n");
 		scmd_callback(scmd_msgBuf, slen);
 		return scmd_normal;
 	}
 	else if (ret != 0)
 	{
 		slen += sprintf(scmd_msgBuf + slen,
-			"<dac5667 set(error) code=%d\r\n", ret);
+			"<dac5667 cvs set(error) code=%d\r\n", ret);
 		scmd_callback(scmd_msgBuf, slen);
 		return scmd_normal;
 	}
 
 	slen += sprintf(scmd_msgBuf + slen,
-		"<dac5667 set(ok) %s %.2fV\r\n", mode_name(mode), (double)voltage);
+		"<dac5667 cvs set(ok) %s %.2fV\r\n", mode_name(mode), (double)voltage);
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
