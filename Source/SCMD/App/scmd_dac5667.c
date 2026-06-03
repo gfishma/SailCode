@@ -53,7 +53,11 @@ scmd_errCode_def scmd_dac5667(char* pData, unsigned short len)
 
 void scmd_dac5667_init_default(void)
 {
-	dac5667_init(&dac5667_module, &emio_instance.chip[0], &emio_instance.chip[2]);
+	int ret;
+
+	ret = dac5667_init(&dac5667_module, &emio_instance.chip[0], &emio_instance.chip[2]);
+	if (ret != 0)
+		printf("<dac5667 init(default) error code=%d\r\n", ret);
 }
 
 static scmd_errCode_def __help(char *pData, unsigned short len)

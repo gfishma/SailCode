@@ -99,7 +99,11 @@ void scmd_switch_init_default(void)
 		sm_instance.output_chip_mux_ch[i] = 4;
 	}
 
-	switch_matrix_init(&sm_instance);
+	{
+		int ret = switch_matrix_init(&sm_instance);
+		if (ret != 0)
+			printf("<switch init(default) error code=%d\r\n", ret);
+	}
 }
 
 static scmd_errCode_def __help(char *pData, unsigned short len)

@@ -50,8 +50,15 @@ scmd_errCode_def scmd_emio(char* pData, unsigned short len)
 
 void scmd_emio_init_default(void)
 {
-	emio_init(&emio_instance);
-	emio_reset(&emio_instance);
+	int ret;
+
+	ret = emio_init(&emio_instance);
+	if (ret != 0)
+		printf("<em_io init(default) %d chip(s) failed\r\n", ret);
+
+	ret = emio_reset(&emio_instance);
+	if (ret != 0)
+		printf("<em_io reset(default) error code=%d\r\n", ret);
 }
 
 static scmd_errCode_def __init(char *pData, unsigned short len)
