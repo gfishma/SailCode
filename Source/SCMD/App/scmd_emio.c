@@ -3,8 +3,10 @@
  *
  * EM_IO serial command handler (CAT9555 IO Expander)
  * Command format:
- *   em_io set(io_num, 0/1)         -- single IO
- *   em_io set([io1, lv1], [io2, lv2], ...)  -- multi IO
+ *   em_io set(io_num, 0/1)         -- single IO set
+ *   em_io set([io1, lv1], [io2, lv2], ...)  -- multi IO set
+ *   em_io read(io_num)             -- single IO read
+ *   em_io read([io1],[io2], ...)   -- multi IO read
  *   em_io info                     -- show configuration
  *   em_io help                     -- show help
  */
@@ -20,6 +22,7 @@ extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
 static scmd_errCode_def __help(char *pData, unsigned short len);
 static scmd_errCode_def __info(char *pData, unsigned short len);
 static scmd_errCode_def __set(char* pData, unsigned short len);
+static scmd_errCode_def __read(char* pData, unsigned short len);
 static scmd_errCode_def __init(char* pData, unsigned short len);
 static scmd_errCode_def __reset(char* pData, unsigned short len);
 
@@ -32,6 +35,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __init,  .name = "init",  .dest = ">em_io init",                              .isVisible = 1,},
 	{.func = __reset, .name = "reset", .dest = ">em_io reset",                             .isVisible = 1,},
 	{.func = __set,   .name = "set",   .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
+	{.func = __read,  .name = "read",  .dest = ">em_io read(io1) or read([io1],[io2], ...)",         .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -234,6 +238,99 @@ static scmd_errCode_def __reset(char *pData, unsigned short len)
 
 	unsigned short slen = 0;
 	slen += sprintf(scmd_msgBuf + slen, "<em_io reset(ok) IO[74,76,8,19,29,11]=1 others=0\r\n");
+	scmd_callback(scmd_msgBuf, slen);
+	return scmd_normal;
+}
+
+/*
+ * Parse read command:
+ *   read(io_num)              -- single
+ *   read([io_num], ...)       -- multi (max 16 IOs)
+ */
+static scmd_errCode_def __read(char *pData, unsigned short len)
+{
+	char *pNet = pData;
+	char *pEnd;
+	unsigned short slen = 0;
+	unsigned char io_list[EMIO_MAX_MULTI];
+	unsigned char count = 0;
+	unsigned char i;
+	long val;
+
+	str_deSpace(pData);
+
+	pEnd = strstr(pNet, ")");
+	if (pEnd == NULL)
+		return __scmd_ErrMsg("<em_io read(error), ')' not found.\r\n");
+
+	pNet = strstr(pNet, "(");
+	if (pNet == NULL)
+		return __scmd_ErrMsg("<em_io read(error), '(' not found.\r\n");
+	pNet += 1;
+
+	str_deSpace(pNet);
+
+	/* multi mode: starts with '[' */
+	if (*pNet == '[')
+	{
+		while (pNet < pEnd && count < EMIO_MAX_MULTI)
+		{
+			if (*pNet != '[')
+				return __scmd_ErrMsg("<em_io read(error), '[' expected.\r\n");
+			pNet += 1;
+
+			pNet = str_GetHexDec(pNet, pEnd, &val);
+			if (pNet == NULL)
+				return __scmd_ErrMsg("<em_io read(error), IO number not found in [].\r\n");
+			if (val < 1 || val > EMIO_TOTAL_IO)
+				return __scmd_ErrMsg("<em_io read(error), IO number over range (1-96).\r\n");
+
+			if (*pNet != ']')
+				return __scmd_ErrMsg("<em_io read(error), ']' expected.\r\n");
+			pNet += 1;
+
+			io_list[count++] = (unsigned char)val;
+
+			str_deSpace(pNet);
+			if (*pNet == ',')
+			{
+				pNet += 1;
+				str_deSpace(pNet);
+			}
+		}
+	}
+	else
+	{
+		/* single mode */
+		pNet = str_GetHexDec(pNet, pEnd, &val);
+		if (pNet == NULL)
+			return __scmd_ErrMsg("<em_io read(error), IO number not found.\r\n");
+		if (val < 1 || val > EMIO_TOTAL_IO)
+			return __scmd_ErrMsg("<em_io read(error), IO number over range (1-96).\r\n");
+		io_list[0] = (unsigned char)val;
+		count = 1;
+	}
+
+	/* execute */
+	slen += sprintf(scmd_msgBuf + slen, "<em_io read(ok) ");
+	for (i = 0; i < count; i++)
+	{
+		unsigned char lv;
+		int ret = emio_read_io(&emio_instance, io_list[i], &lv);
+		if (ret != 0)
+		{
+			slen += sprintf(scmd_msgBuf + slen,
+				"IO%d(error=%d)", io_list[i], ret);
+		}
+		else
+		{
+			slen += sprintf(scmd_msgBuf + slen,
+				"IO%d=%d", io_list[i], lv);
+		}
+		if (i < count - 1)
+			slen += sprintf(scmd_msgBuf + slen, ", ");
+	}
+	slen += sprintf(scmd_msgBuf + slen, "\r\n");
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }

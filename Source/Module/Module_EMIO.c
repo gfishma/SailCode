@@ -124,3 +124,27 @@ int emio_set_io(emio_class* self, unsigned char io_num, unsigned char level)
 
 	return cat9555_set_pin(&self->chip[chip_idx], pin, level);
 }
+
+int emio_read_io(emio_class* self, unsigned char io_num, unsigned char* pLevel)
+{
+	unsigned char chip_idx;
+	unsigned char pin;
+	int ret;
+
+	if (io_num < 1 || io_num > EMIO_TOTAL_IO)
+		return -1;
+	if (pLevel == NULL)
+		return -2;
+
+	io_num -= 1;
+	chip_idx = io_num / EMIO_IO_PER_CHIP;
+	pin = io_num % EMIO_IO_PER_CHIP;
+
+	if (chip_idx < 3)
+		ret = pca9847_select_channel(&self->mux_i2c2, 6);
+	else
+		ret = pca9847_select_channel(&self->mux_i2c1, 0);
+	if (ret != 0) return -3;
+
+	return cat9555_read_pin(&self->chip[chip_idx], pin, pLevel);
+}
