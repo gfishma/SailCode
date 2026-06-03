@@ -13,8 +13,6 @@ int ad5667_init(ad5667_class* self)
 	self->i2c.addr = AD5667_FIXED_ID;
 	self->dac_a_code = 0;
 	self->dac_b_code = 0;
-	if (i2c_bus_init(self->i2c.bus) != i2c_ok)
-		return -1;
 
 	/* Power up both DACs (default is power-down after reset) */
 	i2c_dev_write_multi(&self->i2c, AD5667_CMD_POWER_UP_ALL, 2, buf);
