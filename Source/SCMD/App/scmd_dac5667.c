@@ -179,8 +179,12 @@ static scmd_errCode_def __cvs_set(char *pData, unsigned short len)
 		return scmd_normal;
 	}
 
-	slen += sprintf(scmd_msgBuf + slen,
-		"<dac5667 cvs set(ok) %s %.2fV\r\n", mode_name(mode), (double)voltage);
+	{
+		unsigned short v_int = (unsigned short)voltage;
+		unsigned short v_frac = (unsigned short)((voltage - (float)v_int) * 100.0f + 0.5f);
+		slen += sprintf(scmd_msgBuf + slen,
+			"<dac5667 cvs set(ok) %s %d.%02dV\r\n", mode_name(mode), v_int, v_frac);
+	}
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
@@ -228,8 +232,14 @@ static scmd_errCode_def __ccs_set(char *pData, unsigned short len)
 		return scmd_normal;
 	}
 
-	slen += sprintf(scmd_msgBuf + slen,
-		"<dac5667 ccs set(ok) %.3fmA\r\n", (double)current_ma);
+	{
+		float c_abs = (current_ma < 0.0f) ? -current_ma : current_ma;
+		unsigned short c_int = (unsigned short)c_abs;
+		unsigned short c_frac = (unsigned short)((c_abs - (float)c_int) * 1000.0f + 0.5f);
+		slen += sprintf(scmd_msgBuf + slen,
+			"<dac5667 ccs set(ok) %c%d.%03dmA\r\n",
+			(current_ma < 0.0f) ? '-' : '+', c_int, c_frac);
+	}
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
