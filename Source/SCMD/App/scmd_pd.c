@@ -151,7 +151,15 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 		return __scmd_ErrMsg("<pd set(error) invalid voltage, use 5V/9V/12V/15V/18V/20V\r\n");
 
 	ret = pd_request_voltage(&pd_module, v_code);
-	if (ret != 0)
+	if (ret == -4)
+	{
+		slen += sprintf(scmd_msgBuf + slen,
+			"<pd set(error) %s not supported by charger\r\n",
+			voltage_name((v_code & 0xF0) >> 4));
+		scmd_callback(scmd_msgBuf, slen);
+		return scmd_normal;
+	}
+	else if (ret != 0)
 	{
 		slen += sprintf(scmd_msgBuf + slen,
 			"<pd set(error) code=%d\r\n", ret);

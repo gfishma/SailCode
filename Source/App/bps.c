@@ -61,7 +61,7 @@ extern scmd_class scmd_ctrl;
 
 // bps
 
-uint8_t scmd_buff[1024];
+uint8_t scmd_buff[512];
 gpio_class led = GPIOM_NEW(E, 0, GPIO_MODE_OUTPUT_PP);
 
 

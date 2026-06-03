@@ -42,11 +42,22 @@ int pd_request_voltage(pd_module_class* self, unsigned char voltage_code)
 	    (voltage_code & 0xF0) > HUSB238_VOLTAGE_20V)
 		return -1;
 
+	/* check if source supports this voltage */
+	{
+		unsigned char v_idx = (voltage_code & 0xF0) >> 4;  /* 1=5V..6=20V */
+		unsigned char pdo_reg, pdo_data;
+
+		ret = pca9847_select_channel(&self->mux, PD_MUX_CH);
+		if (ret != 0) return -2;
+
+		pdo_reg = HUSB238_REG_SRC_PDO_5V + (v_idx - 1);
+		ret = i2c_dev_read_byte(&self->husb238, pdo_reg, &pdo_data);
+		if (ret != i2c_ack) { pca9847_disable_all(&self->mux); return -3; }
+		if (!(pdo_data & 0x80))  { pca9847_disable_all(&self->mux); return -4; }
+	}
+
 	/* combine voltage with 3A current request */
 	cmd = voltage_code | HUSB238_CURRENT_3_0A;
-
-	ret = pca9847_select_channel(&self->mux, PD_MUX_CH);
-	if (ret != 0) return -2;
 
 	ret = i2c_dev_write_byte(&self->husb238, HUSB238_REG_GO_COMMAND, cmd);
 

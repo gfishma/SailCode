@@ -17,7 +17,7 @@
 #include "sPrintf.h"
 
 
-#define scmd_MsgBufQty					2048
+#define scmd_MsgBufQty					1536
 
 //extern unsigned short slen = 0;
 extern char scmd_msgBuf[scmd_MsgBufQty];
