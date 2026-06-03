@@ -19,6 +19,11 @@ int ad5667_init(ad5667_class* self)
 	/* Power up both DACs (default is power-down after reset) */
 	i2c_dev_write_multi(&self->i2c, AD5667_CMD_POWER_UP_ALL, 2, buf);
 
+	/* Enable internal reference (required for R variant) */
+	buf[0] = 0x80; buf[1] = 0x00;
+	i2c_dev_write_multi(&self->i2c, AD5667_CMD_REF_ON_ALL, 2, buf);
+	buf[0] = 0x00; buf[1] = 0x00;
+
 	ad5667_set_dac_a(self, 0);
 	return ad5667_set_dac_b(self, 0);
 }

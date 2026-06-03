@@ -15,6 +15,7 @@
 #define AD5667_CMD_WRITE_UPDATE_DAC_A   0x18   /* 0001 1000: write+update DAC A */
 #define AD5667_CMD_WRITE_UPDATE_DAC_B   0x19   /* 0001 1001: write+update DAC B */
 #define AD5667_CMD_POWER_UP_ALL         0x27   /* 0010 0111: power-up both DACs, data=0x0000 */
+#define AD5667_CMD_REF_ON_ALL           0x3F   /* 0011 1111: internal ref on both, data=0x8000 */
 
 /* Output range: 0 to 2*Vref = 0 to 5V, 16-bit */
 #define AD5667_MAX_CODE         65535
