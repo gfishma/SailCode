@@ -9,7 +9,7 @@
 
 #include "std_i2c.h"
 
-#define AD5667_FIXED_ID         0x0C
+#define AD5667_FIXED_ID         0x0F
 
 /* Command byte format: [C3 C2 C1 C0 A1 A0 X X] */
 #define AD5667_CMD_WRITE_UPDATE_DAC_A   0x31   /* 0011 00 01: write+update DAC A */

@@ -92,7 +92,7 @@ int dac5667_set_voltage(dac5667_module_class* self, dac5667_path_def path, float
 
 	/* check IO path state via PCA9847 CH7 */
 	ret = check_path(&self->mux, self->io_chip0, self->io_chip2, &io7, &io33);
-	if (ret != 0) return -12;
+	if (ret != 0) return (ret - 30);
 
 	if (io7 != exp_io7 || io33 != exp_io33)
 		return -20;  /* path mismatch */
