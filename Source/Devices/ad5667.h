@@ -11,10 +11,10 @@
 
 #define AD5667_FIXED_ID         0x0F
 
-/* Command byte format: [C3 C2 C1 C0 A1 A0 X X] */
-#define AD5667_CMD_WRITE_UPDATE_DAC_A   0x31   /* 0011 00 01: write+update DAC A */
-#define AD5667_CMD_WRITE_UPDATE_DAC_B   0x34   /* 0011 01 00: write+update DAC B */
-#define AD5667_CMD_POWER_UP_ALL         0x4C   /* 0100 11 00: power-up both DACs, data=0x0000 */
+/* Command byte format: [R=0][S=0][C2][C1][C0][A2][A1][A0] */
+#define AD5667_CMD_WRITE_UPDATE_DAC_A   0x18   /* 0001 1000: write+update DAC A */
+#define AD5667_CMD_WRITE_UPDATE_DAC_B   0x19   /* 0001 1001: write+update DAC B */
+#define AD5667_CMD_POWER_UP_ALL         0x27   /* 0010 0111: power-up both DACs, data=0x0000 */
 
 /* Output range: 0 to 2*Vref = 0 to 5V, 16-bit */
 #define AD5667_MAX_CODE         65535
