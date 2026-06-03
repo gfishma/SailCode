@@ -5,8 +5,10 @@
  */
 
 #include "Module_DAC5667.h"
+#include "Module_DVM_V2.h"
 
 extern i2c_bus_class i2c_bus_list[];
+extern M_DVM_V2_Def DVM_V2;
 
 int dac5667_init(dac5667_module_class* self, cat9555_class* chip0, cat9555_class* chip2)
 {
@@ -178,4 +180,44 @@ int dac5667_set_current(dac5667_module_class* self, float current_ma)
 	pca9847_disable_all(&self->mux);
 
 	return ret;
+}
+
+/*
+ * CCS current readback via DVM channel 4.
+ * Reads IO1/IO2 for range resistor, IO3 for polarity,
+ * then DVM voltage / R = current in mA.
+ */
+int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
+{
+	static const float range_r[4] = {
+		DAC5667_CCS_R_100R,
+		DAC5667_CCS_R_499R,
+		DAC5667_CCS_R_10K,
+		DAC5667_CCS_R_1M,
+	};
+	unsigned char io1, io2, io3;
+	unsigned char range;
+	float v_dvm, i_ma;
+	int ret;
+
+	if (!self->io_chip0 || !pCurrent_ma)
+		return -1;
+
+	ret = pca9847_select_channel(&self->mux, DAC5667_EMIO_MUX_CH);
+	if (ret != 0) return -2;
+
+	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, &io1) != 0) return -3;
+	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, &io2) != 0) return -4;
+	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, &io3) != 0) return -5;
+
+	range = (io2 << 1) | io1;
+
+	ret = (int)DVM_V2_GetVolt(&DVM_V2, 4, Dvm_V2_Auto, Dvm_V2_Smp_Time_100MS, &v_dvm);
+	if (ret != 0) return -6;
+
+	i_ma = (v_dvm / range_r[range]) * 1000.0f;
+	if (io3) i_ma = -i_ma;  /* S2 = negative */
+
+	*pCurrent_ma = i_ma;
+	return 0;
 }

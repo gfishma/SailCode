@@ -74,5 +74,6 @@ typedef struct __dac5667_module_class
 int dac5667_init(dac5667_module_class* self, cat9555_class* chip0, cat9555_class* chip2);
 int dac5667_set_voltage(dac5667_module_class* self, dac5667_path_def path, float voltage);
 int dac5667_set_current(dac5667_module_class* self, float current_ma);
+int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma);
 
 #endif /* __MODULE_DAC5667_H_ */

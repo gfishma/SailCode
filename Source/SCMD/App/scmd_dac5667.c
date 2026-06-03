@@ -26,6 +26,7 @@ static scmd_errCode_def __cvs(char* pData, unsigned short len);
 static scmd_errCode_def __cvs_set(char* pData, unsigned short len);
 static scmd_errCode_def __ccs(char* pData, unsigned short len);
 static scmd_errCode_def __ccs_set(char* pData, unsigned short len);
+static scmd_errCode_def __ccs_read(char* pData, unsigned short len);
 
 static dac5667_module_class dac5667_module;
 
@@ -197,7 +198,11 @@ static scmd_errCode_def __ccs(char *pData, unsigned short len)
 		pData += 3;
 		return __ccs_set(pData, len);
 	}
-	return __scmd_ErrMsg("<dac5667 ccs(error) unknown sub, use: ccs set(current_mA)\r\n");
+	if (strncmp(pData, "read", 4) == 0)
+	{
+		return __ccs_read(pData, len);
+	}
+	return __scmd_ErrMsg("<dac5667 ccs(error) unknown sub, use: ccs set/read\r\n");
 }
 
 static scmd_errCode_def __ccs_set(char *pData, unsigned short len)
@@ -238,6 +243,33 @@ static scmd_errCode_def __ccs_set(char *pData, unsigned short len)
 		unsigned short c_frac = (unsigned short)((c_abs - (float)c_int) * 1000.0f + 0.5f);
 		slen += sprintf(scmd_msgBuf + slen,
 			"<dac5667 ccs set(ok) %c%d.%03dmA\r\n",
+			(current_ma < 0.0f) ? '-' : '+', c_int, c_frac);
+	}
+	scmd_callback(scmd_msgBuf, slen);
+	return scmd_normal;
+}
+
+static scmd_errCode_def __ccs_read(char *pData, unsigned short len)
+{
+	unsigned short slen = 0;
+	float current_ma;
+	int ret;
+
+	ret = dac5667_read_current(&dac5667_module, &current_ma);
+	if (ret != 0)
+	{
+		slen += sprintf(scmd_msgBuf + slen,
+			"<dac5667 ccs read(error) code=%d\r\n", ret);
+		scmd_callback(scmd_msgBuf, slen);
+		return scmd_normal;
+	}
+
+	{
+		float c_abs = (current_ma < 0.0f) ? -current_ma : current_ma;
+		unsigned short c_int = (unsigned short)c_abs;
+		unsigned short c_frac = (unsigned short)((c_abs - (float)c_int) * 1000.0f + 0.5f);
+		slen += sprintf(scmd_msgBuf + slen,
+			"<dac5667 ccs read(ok) %c%d.%03dmA\r\n",
 			(current_ma < 0.0f) ? '-' : '+', c_int, c_frac);
 	}
 	scmd_callback(scmd_msgBuf, slen);
