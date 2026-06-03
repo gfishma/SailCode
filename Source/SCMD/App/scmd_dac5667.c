@@ -256,7 +256,14 @@ static scmd_errCode_def __ccs_read(char *pData, unsigned short len)
 	int ret;
 
 	ret = dac5667_read_current(&dac5667_module, &current_ma);
-	if (ret != 0)
+	if (ret == -8)
+	{
+		slen += sprintf(scmd_msgBuf + slen,
+			"<dac5667 ccs read(error) CCS not configured, use ccs set first\r\n");
+		scmd_callback(scmd_msgBuf, slen);
+		return scmd_normal;
+	}
+	else if (ret != 0)
 	{
 		slen += sprintf(scmd_msgBuf + slen,
 			"<dac5667 ccs read(error) code=%d\r\n", ret);

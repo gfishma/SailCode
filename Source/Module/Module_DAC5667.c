@@ -195,7 +195,7 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 		DAC5667_CCS_R_10K,
 		DAC5667_CCS_R_1M,
 	};
-	unsigned char io1, io2, io3;
+	unsigned char io1, io2, io3, io5;
 	unsigned char range;
 	float v_dvm, i_ma;
 	int ret;
@@ -209,6 +209,9 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, &io1) != 0) return -3;
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, &io2) != 0) return -4;
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, &io3) != 0) return -5;
+	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, &io5) != 0) return -7;
+
+	if (io5 == 0) return -8;  /* CCS MUX disabled, no CCS configured */
 
 	range = (io2 << 1) | io1;
 
