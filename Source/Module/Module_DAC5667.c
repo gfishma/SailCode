@@ -27,6 +27,11 @@ int dac5667_init(dac5667_module_class* self, cat9555_class* chip0, cat9555_class
 	if (ret != 0) return -1;
 
 	ret = ad5667_init(&self->dac);
+	if (ret != 0)
+	{
+		/* DAC NACK — reset I2C bus to prevent bus hang */
+		i2c_bus_init(self->dac.i2c.bus);
+	}
 
 	pca9847_disable_all(&self->mux);
 
