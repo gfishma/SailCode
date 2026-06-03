@@ -10,6 +10,8 @@ int pca9847_init(pca9847_class* self)
 {
 	self->i2c.addr = self->addr;
 	self->current_ch = 0xFF;
+	if (i2c_bus_init(self->i2c.bus) != i2c_ok)
+		return -1;
 	return pca9847_disable_all(self);
 }
 
