@@ -22,27 +22,27 @@ static scmd_errCode_def __set(char* pData, unsigned short len);
 
 static pd_module_class pd_module;
 
-static const char* voltage_name(unsigned char v)
+static const char* voltage_name(unsigned char pdo)
 {
-	switch (v) {
-	case 1: return "5V";
-	case 2: return "9V";
-	case 3: return "12V";
-	case 4: return "15V";
-	case 5: return "18V";
-	case 6: return "20V";
-	default: return "??";
+	switch (pdo) {
+	case HUSB238_PDO_5V:  return "5V";
+	case HUSB238_PDO_9V:  return "9V";
+	case HUSB238_PDO_12V: return "12V";
+	case HUSB238_PDO_15V: return "15V";
+	case HUSB238_PDO_18V: return "18V";
+	case HUSB238_PDO_20V: return "20V";
+	default:              return "??";
 	}
 }
 
 static unsigned char parse_voltage(const char* s)
 {
-	if (strncmp(s, "5V", 2) == 0)  return HUSB238_VOLTAGE_5V;
-	if (strncmp(s, "9V", 2) == 0)  return HUSB238_VOLTAGE_9V;
-	if (strncmp(s, "12V", 3) == 0) return HUSB238_VOLTAGE_12V;
-	if (strncmp(s, "15V", 3) == 0) return HUSB238_VOLTAGE_15V;
-	if (strncmp(s, "18V", 3) == 0) return HUSB238_VOLTAGE_18V;
-	if (strncmp(s, "20V", 3) == 0) return HUSB238_VOLTAGE_20V;
+	if (strncmp(s, "5V", 2) == 0)  return HUSB238_PDO_5V;
+	if (strncmp(s, "9V", 2) == 0)  return HUSB238_PDO_9V;
+	if (strncmp(s, "12V", 3) == 0) return HUSB238_PDO_12V;
+	if (strncmp(s, "15V", 3) == 0) return HUSB238_PDO_15V;
+	if (strncmp(s, "18V", 3) == 0) return HUSB238_PDO_18V;
+	if (strncmp(s, "20V", 3) == 0) return HUSB238_PDO_20V;
 	return 0;
 }
 
@@ -93,7 +93,6 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 
 	slen += sprintf(scmd_msgBuf + slen, "<pd info:\r\n");
 
-	/* current negotiated status */
 	ret = pd_get_status(&pd_module, &v, &c);
 	if (ret == 0)
 	{
@@ -106,15 +105,19 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 			"  Negotiated: (error %d)\r\n", ret);
 	}
 
-	/* available PDOs from source */
 	ret = pd_get_available_pdo(&pd_module, &pdo_mask);
 	if (ret == 0 && pdo_mask != 0)
 	{
+		/* linear indices from 0x02-0x07 → PDO code lookup */
+		static const unsigned char idx_pdo[6] = {
+			HUSB238_PDO_5V,  HUSB238_PDO_9V,  HUSB238_PDO_12V,
+			HUSB238_PDO_15V, HUSB238_PDO_18V, HUSB238_PDO_20V,
+		};
 		slen += sprintf(scmd_msgBuf + slen, "  Available: ");
 		for (int i = 0; i < 6; i++)
 		{
 			if (pdo_mask & (1 << i))
-				slen += sprintf(scmd_msgBuf + slen, "%s ", voltage_name(i + 1));
+				slen += sprintf(scmd_msgBuf + slen, "%s ", voltage_name(idx_pdo[i]));
 		}
 		slen += sprintf(scmd_msgBuf + slen, "\r\n");
 	}
@@ -155,7 +158,7 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	{
 		slen += sprintf(scmd_msgBuf + slen,
 			"<pd set(error) %s not supported by charger\r\n",
-			voltage_name((v_code & 0xF0) >> 4));
+			voltage_name(v_code));
 		scmd_callback(scmd_msgBuf, slen);
 		return scmd_normal;
 	}
@@ -168,7 +171,7 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	}
 
 	slen += sprintf(scmd_msgBuf + slen,
-		"<pd set(ok) request %s\r\n", voltage_name((v_code & 0xF0) >> 4));
+		"<pd set(ok) request %s\r\n", voltage_name(v_code));
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
