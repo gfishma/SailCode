@@ -25,7 +25,17 @@ int ad5667_init(ad5667_class* self)
 	buf[0] = 0x00; buf[1] = 0x00;
 
 	ad5667_set_dac_a(self, 0);
-	return ad5667_set_dac_b(self, 0);
+
+	/* retry: DAC may need settling time after ref enable */
+	{
+		int ret, tries;
+		for (tries = 0; tries < 3; tries++)
+		{
+			ret = ad5667_set_dac_b(self, 0);
+			if (ret == 0) break;
+		}
+		return ret;
+	}
 }
 
 int ad5667_set_dac_a(ad5667_class* self, unsigned short code)
