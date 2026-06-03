@@ -21,8 +21,6 @@
 int cat9555_init(cat9555_class* self)
 {
 	self->i2c.addr = (cat9555_fixed_id | self->id);
-	if(i2c_bus_init(self->i2c.bus) != i2c_ok)
-	{ return -1; }
 	return cat9555_set_pin_inHex(self, 0x0000);	// 输出全清零
 }
 

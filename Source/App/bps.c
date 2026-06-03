@@ -194,6 +194,11 @@ void bsp_init()
 	gpio_config(&led);
 	usart_init(&usart_1);
 	scmd_init(&scmd_ctrl);
+
+	/* Unified I2C bus initialization — all devices share these */
+	for (uint16_t i = 0; i < i2c_bus_list_qty; i++)
+		i2c_bus_init(&i2c_bus_list[i]);
+
 	// DVM_V2_Init(&DVM_V2);
 	DVM_config();
 	scmd_switch_init_default();
