@@ -165,8 +165,8 @@ int dac5667_set_current(dac5667_module_class* self, float current_ma)
 
 	/* disable MUX first, then configure IOs */
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, 0);
-	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, range & 0x01);
-	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, (range >> 1) & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, (range >> 1) & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, range & 0x01);
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, (mux_ch >> 1) & 0x01);
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO4_PIN, mux_ch & 0x01);
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, 1);
@@ -213,7 +213,7 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 
 	if (io5 == 0) return -8;  /* CCS MUX disabled, no CCS configured */
 
-	range = (io2 << 1) | io1;
+	range = (io1 << 1) | io2;
 
 	ret = (int)DVM_V2_GetVolt(&DVM_V2, 4, Dvm_V2_Auto, Dvm_V2_Smp_Time_100MS, &v_dvm);
 	if (ret != 0) return -6;

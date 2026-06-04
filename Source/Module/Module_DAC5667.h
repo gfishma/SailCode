@@ -12,7 +12,7 @@
  * DAC A → CCS current source via IO1-IO5:
  *   IO5: MUX enable (active high)
  *   IO3,IO4: MUX channel (A1,A0) — S1(0,0)=pos, S2(0,1)=neg
- *   IO2,IO1: Range — 00=100R, 01=499R, 10=10K, 11=1M
+ *   IO1,IO2: Range (A1,A0) — 00=100R, 01=499R, 10=10K, 11=1M
  *   I = VDAC / R, sign via MUX polarity
  */
 
@@ -28,8 +28,8 @@
 #define DAC5667_IO33_PIN     0     /* chip2 pin0 */
 
 /* CCS IOs (all on chip0) */
-#define DAC5667_CCS_IO1_PIN  0     /* RANGE_SEL0 (LSB) */
-#define DAC5667_CCS_IO2_PIN  1     /* RANGE_SEL1 (MSB) */
+#define DAC5667_CCS_IO1_PIN  0     /* RANGE_A1 (MSB) */
+#define DAC5667_CCS_IO2_PIN  1     /* RANGE_A0 (LSB) */
 #define DAC5667_CCS_IO3_PIN  2     /* MUX_A1 */
 #define DAC5667_CCS_IO4_PIN  3     /* MUX_A0 */
 #define DAC5667_CCS_IO5_PIN  4     /* MUX_EN, active high */
