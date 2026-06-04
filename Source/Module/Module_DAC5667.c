@@ -167,8 +167,8 @@ int dac5667_set_current(dac5667_module_class* self, float current_ma)
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, 0);
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, range & 0x01);
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, (range >> 1) & 0x01);
-	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, mux_ch & 0x01);
-	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO4_PIN, (mux_ch >> 1) & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, (mux_ch >> 1) & 0x01);
+	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO4_PIN, mux_ch & 0x01);
 	cat9555_set_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, 1);
 
 	/* switch to CH2 and set DAC A */
@@ -208,7 +208,7 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, &io1) != 0) return -3;
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO2_PIN, &io2) != 0) return -4;
-	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO3_PIN, &io3) != 0) return -5;
+	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO4_PIN, &io3) != 0) return -5;  /* IO4=A0 polarity */;
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO5_PIN, &io5) != 0) return -7;
 
 	if (io5 == 0) return -8;  /* CCS MUX disabled, no CCS configured */
