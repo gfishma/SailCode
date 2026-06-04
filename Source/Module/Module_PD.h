@@ -12,7 +12,7 @@
 #include "husb238.h"
 #include "std_i2c.h"
 
-#define PD_MUX_CH               3     /* PCA9847 CH4, 0-based index 3 */
+#define PD_MUX_CH               2     /* PCA9847 CH3, 0-based index 2, ctrl 0x0A */
 
 typedef struct __pd_module_class
 {
