@@ -1,16 +1,13 @@
 /*
  * Module_PD.c
  *
- * HUSB238 PD Sink module
+ * HUSB238 PD Sink module — mux channel passed at init
  */
 
 #include "Module_PD.h"
 
 extern i2c_bus_class i2c_bus_list[];
 
-/*
- * Voltage code lookup: pdo_code → string index (0=??, 1=5V..6=20V)
- */
 static unsigned char pdo_to_index(unsigned char pdo)
 {
 	switch (pdo) {
@@ -24,21 +21,12 @@ static unsigned char pdo_to_index(unsigned char pdo)
 	}
 }
 
-static const unsigned char index_to_pdo[7] = {
-	0,                        /* 0 = invalid */
-	HUSB238_PDO_5V,           /* 1 */
-	HUSB238_PDO_9V,           /* 2 */
-	HUSB238_PDO_12V,          /* 3 */
-	HUSB238_PDO_15V,          /* 4 */
-	HUSB238_PDO_18V,          /* 5 */
-	HUSB238_PDO_20V,          /* 6 */
-};
-
-int pd_init(pd_module_class* self)
+int pd_init(pd_module_class* self, unsigned char mux_ch)
 {
 	int ret;
 	unsigned char dummy;
 
+	self->mux_ch = mux_ch;
 	self->mux.i2c.bus = &i2c_bus_list[1];
 	self->mux.i2c.addr_wide = i2c_8bit_mode;
 	self->mux.addr = 0x59;
@@ -47,10 +35,9 @@ int pd_init(pd_module_class* self)
 	self->husb238.addr_wide = i2c_8bit_mode;
 	self->husb238.addr = HUSB238_I2C_ADDR;
 
-	ret = pca9847_select_channel(&self->mux, PD_MUX_CH);
+	ret = pca9847_select_channel(&self->mux, self->mux_ch);
 	if (ret != 0) return -1;
 
-	/* verify chip presence */
 	ret = i2c_dev_read_byte(&self->husb238, HUSB238_REG_PD_STATUS0, &dummy);
 
 	pca9847_disable_all(&self->mux);
@@ -58,12 +45,6 @@ int pd_init(pd_module_class* self)
 	return (ret == i2c_ack) ? 0 : -2;
 }
 
-/*
- * Request PD voltage.
- *   1. Check source supports this PDO
- *   2. Write SRC_PDO with PDO_SELECT
- *   3. Write GO_COMMAND with REQUEST_PDO
- */
 int pd_request_voltage(pd_module_class* self, unsigned char pdo_code)
 {
 	unsigned char pdo_reg, pdo_data;
@@ -73,8 +54,7 @@ int pd_request_voltage(pd_module_class* self, unsigned char pdo_code)
 	v_idx = pdo_to_index(pdo_code);
 	if (v_idx == 0) return -1;
 
-	/* check source capability */
-	ret = pca9847_select_channel(&self->mux, PD_MUX_CH);
+	ret = pca9847_select_channel(&self->mux, self->mux_ch);
 	if (ret != 0) return -2;
 
 	pdo_reg = HUSB238_REG_SRC_PDO_5V + (v_idx - 1);
@@ -83,11 +63,9 @@ int pd_request_voltage(pd_module_class* self, unsigned char pdo_code)
 	if (!(pdo_data & HUSB238_PDO_DETECT_MASK))
 		{ pca9847_disable_all(&self->mux); return -4; }
 
-	/* Step 1: select PDO */
 	ret = i2c_dev_write_byte(&self->husb238, HUSB238_REG_SRC_PDO, pdo_code);
 	if (ret != i2c_ack) { pca9847_disable_all(&self->mux); return -5; }
 
-	/* Step 2: trigger request */
 	ret = i2c_dev_write_byte(&self->husb238, HUSB238_REG_GO_COMMAND,
 		HUSB238_GO_REQUEST_PDO);
 
@@ -101,7 +79,7 @@ int pd_get_status(pd_module_class* self, unsigned char* pVoltage, unsigned char*
 	unsigned char data;
 	int ret;
 
-	ret = pca9847_select_channel(&self->mux, PD_MUX_CH);
+	ret = pca9847_select_channel(&self->mux, self->mux_ch);
 	if (ret != 0) return -1;
 
 	ret = i2c_dev_read_byte(&self->husb238, HUSB238_REG_PD_STATUS0, &data);
@@ -116,10 +94,6 @@ int pd_get_status(pd_module_class* self, unsigned char* pVoltage, unsigned char*
 	return 0;
 }
 
-/*
- * Scan SRC_PDO registers 0x02-0x07.
- * Returns a bitmask of available voltage indices (1=5V..6=20V).
- */
 int pd_get_available_pdo(pd_module_class* self, unsigned char* pPdoMask)
 {
 	unsigned char data;
@@ -127,7 +101,7 @@ int pd_get_available_pdo(pd_module_class* self, unsigned char* pPdoMask)
 	int ret;
 	int i;
 
-	ret = pca9847_select_channel(&self->mux, PD_MUX_CH);
+	ret = pca9847_select_channel(&self->mux, self->mux_ch);
 	if (ret != 0) return -1;
 
 	for (i = 0; i < 6; i++)
