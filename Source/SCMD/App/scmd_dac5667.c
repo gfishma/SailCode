@@ -7,6 +7,7 @@
  *   dac5667 cvs set(A, 10.0)   -- amplified 0~35V
  *   dac5667 cvs set(N, 3.0)    -- negative 0~-5V
  *   dac5667 ccs set(1.5)   -- CCS current (mA, sign=polarity)
+ *   dac5667 ccs read       -- CCS current readback
  *   dac5667 info           -- show configuration
  *   dac5667 help           -- show help
  */
@@ -35,7 +36,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __help, .name = "help", .dest = ">dac5667 help",                                       .isVisible = 1,},
 	{.func = __info, .name = "info", .dest = ">dac5667 info",                                       .isVisible = 1,},
 	{.func = __cvs,  .name = "cvs",  .dest = ">dac5667 cvs set(V/A/N, voltage)  V:0-5V A:0-35V N:0~-5V", .isVisible = 1,},
-	{.func = __ccs,  .name = "ccs",  .dest = ">dac5667 ccs set(current_mA)  sign=polarity",              .isVisible = 1,},
+	{.func = __ccs,  .name = "ccs",  .dest = ">dac5667 ccs set(current_mA) / ccs read",                 .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
