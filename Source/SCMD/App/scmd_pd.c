@@ -35,6 +35,29 @@ static const char* voltage_name(unsigned char pdo)
 	}
 }
 
+static const char* current_name(unsigned char code)
+{
+	switch (code) {
+	case 0x00: return "0.5A";
+	case 0x01: return "0.7A";
+	case 0x02: return "1.0A";
+	case 0x03: return "1.25A";
+	case 0x04: return "1.5A";
+	case 0x05: return "1.75A";
+	case 0x06: return "2.0A";
+	case 0x07: return "2.25A";
+	case 0x08: return "2.5A";
+	case 0x09: return "2.75A";
+	case 0x0A: return "3.0A";
+	case 0x0B: return "3.25A";
+	case 0x0C: return "3.5A";
+	case 0x0D: return "4.0A";
+	case 0x0E: return "4.5A";
+	case 0x0F: return "5.0A";
+	default:   return "?A";
+	}
+}
+
 static unsigned char parse_voltage(const char* s)
 {
 	if (strncmp(s, "5V", 2) == 0)  return HUSB238_PDO_5V;
@@ -97,7 +120,7 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 	if (ret == 0)
 	{
 		slen += sprintf(scmd_msgBuf + slen,
-			"  Negotiated: %s\r\n", voltage_name(v));
+			"  Negotiated: %s %s\r\n", voltage_name(v), current_name(c));
 	}
 	else
 	{
