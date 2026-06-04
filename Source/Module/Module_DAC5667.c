@@ -218,7 +218,6 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 	if (ret != 0) return -6;
 
 	i_ma = (v_dvm / range_r[range]) * 1000.0f;
-t/* DVM returns signed voltage (diff-amp preserves polarity) */
 
 	*pCurrent_ma = i_ma;
 	return 0;
