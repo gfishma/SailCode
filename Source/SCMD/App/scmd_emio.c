@@ -39,7 +39,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __set,   .name = "set",   .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
 	{.func = __read,  .name = "read",  .dest = ">em_io read(io1) or read([io1],[io2], ...)",         .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">em_io scan",                                       .isVisible = 1,},
-	{.func = __config, .name = "config", .dest = ">em_io config(chip_id, i2c_x, mux_ch, addr)",       .isVisible = 1,},
+	{.func = __config, .name = "config", .dest = ">em_io config(io, i2c_x, mux_ch, addr)",             .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -402,27 +402,29 @@ static scmd_errCode_def __scan(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-/* em_io config(chip_id, i2c_x, mux_ch, addr) */
+/* em_io config(io, i2c_x, mux_ch, addr) — io maps to chip index automatically */
 static scmd_errCode_def __config(char *pData, unsigned short len)
 {
 	char *pNet = pData, *pEnd;
 	unsigned short qty = 1;
 	unsigned short slen = 0;
-	long chip_id, i2c_idx, mux_ch, addr;
+	long io_num, i2c_idx, mux_ch, addr;
+	unsigned char chip_id;
 
 	str_deSpace(pData);
 	pEnd = strstr(pNet, ")");
 	if (pEnd == NULL) return __scmd_ErrMsg("<em_io config(error), ')' not found.\r\n");
 	qty += str_CharQty(pNet, ',');
-	if (qty != 4) return __scmd_ErrMsg("<em_io config(error), need 4 params: chip_id, i2c_x, mux_ch, addr\r\n");
+	if (qty != 4) return __scmd_ErrMsg("<em_io config(error), need 4 params: io, i2c_x, mux_ch, addr\r\n");
 
 	pNet = strstr(pNet, "(");
 	if (pNet == NULL) return __scmd_ErrMsg("<em_io config(error), '(' not found.\r\n");
 	pNet += 1;
 
-	pNet = str_GetHexDec(pNet, pEnd, &chip_id);
-	if (pNet == NULL || chip_id < 0 || chip_id >= EMIO_CHIP_COUNT)
-		return __scmd_ErrMsg("<em_io config(error), chip_id 0-5\r\n");
+	pNet = str_GetHexDec(pNet, pEnd, &io_num);
+	if (pNet == NULL || io_num < 1 || io_num > EMIO_TOTAL_IO)
+		return __scmd_ErrMsg("<em_io config(error), io 1-96\r\n");
+	chip_id = (unsigned char)((io_num - 1) / EMIO_IO_PER_CHIP);
 
 	pNet = (char*)strstr(pNet, ","); pNet += 1;
 	pNet = __scmd_getValidData(pNet, pEnd, "i2c_", &i2c_idx);
@@ -441,14 +443,14 @@ static scmd_errCode_def __config(char *pData, unsigned short len)
 		return __scmd_ErrMsg("<em_io config(error), addr 0x20-0x27\r\n");
 
 	/* apply config */
-	emio_instance.chip_bus[(unsigned char)chip_id] = &i2c_bus_list[i2c_idx];
-	emio_instance.chip_mux[(unsigned char)chip_id] = (unsigned char)mux_ch;
-	emio_instance.chip[(unsigned char)chip_id].id = (unsigned char)(addr - 0x20);
-	emio_instance.chip[(unsigned char)chip_id].i2c.bus = &i2c_bus_list[i2c_idx];
+	emio_instance.chip_bus[chip_id] = &i2c_bus_list[i2c_idx];
+	emio_instance.chip_mux[chip_id] = (unsigned char)mux_ch;
+	emio_instance.chip[chip_id].id = (unsigned char)(addr - 0x20);
+	emio_instance.chip[chip_id].i2c.bus = &i2c_bus_list[i2c_idx];
 
 	slen += sprintf(scmd_msgBuf + slen,
-		"<em_io config(ok) chip %d (IO %d-%d) -> %s CH%d 0x%02X\r\n",
-		(int)chip_id, (int)chip_id * 16 + 1, ((int)chip_id + 1) * 16,
+		"<em_io config(ok) IO %d-%d -> %s CH%d 0x%02X\r\n",
+		(int)chip_id * 16 + 1, ((int)chip_id + 1) * 16,
 		emio_bus_name(emio_instance.chip_bus[chip_id]),
 		(int)mux_ch, (int)addr);
 	scmd_callback(scmd_msgBuf, slen);
