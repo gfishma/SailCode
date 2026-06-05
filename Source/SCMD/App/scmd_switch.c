@@ -42,7 +42,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 1,},
 	{.func = __set,    .name = "set",    .dest = ">switch set(X1,Y2,T13,ON/OFF)  X:1-300 Y:1-5,7-8 T:1-48", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
-	{.func = __scan,   .name = "scan",   .dest = ">switch scan(mux_addr) // scan all CH and ADG2128",.isVisible = 1,},
+	{.func = __scan,   .name = "scan",   .dest = ">switch scan // auto-scan input+output, compare with config",.isVisible = 1,},
 	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1,F2,ON/OFF)   Y:1-5,7-8 F:1-48", .isVisible = 1,},
 	{.func = __meas,   .name = "meas",   .dest = ">switch meas(X1)              X:1-300  measure via T13,DVM CH2", .isVisible = 1,},
 };
@@ -402,69 +402,69 @@ static scmd_errCode_def __reset(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-/* switch scan(mux_addr) -- scan all PCA9847 channels for ADG2128 */
-static scmd_errCode_def __scan(char *pData, unsigned short len)
+/* helper: scan one PCA9847 side, return chip count per channel */
+static unsigned char scan_side(unsigned short* pSlen, const char* tag,
+	i2c_bus_class* bus, unsigned char mux_addr,
+	const unsigned char* exp_cnt)
 {
-	char *pNet = pData;
-	char *pEnd = pData + len;
-	unsigned short slen = 0;
-	unsigned char ch, addr_id;
-	long mux_addr = 0;
+	unsigned char total = 0;
+	unsigned char ch;
+	i2c_dev_class mux_dev = { .bus = bus, .addr_wide = i2c_8bit_mode, .addr = mux_addr };
 
-	str_deSpace(pData);
-
-	pEnd = strstr(pNet, ")");
-	if (pEnd == NULL) return __scmd_ErrMsg("<switch scan(error), ')' not found.\r\n");
-
-	if (str_CharQty(pNet, ',') > 0)
-	{
-		/* format: scan(mux_addr) */
-		pNet = __scmd_getValidData(pNet, pEnd, ",", &mux_addr);
-	}
-	else
-	{
-		/* format: scan(0x59) -- scan from after '(' */
-		pNet = strstr(pNet, "(");
-		if (pNet) pNet = str_GetHexDec(pNet + 1, pEnd, &mux_addr);
-	}
-	if (mux_addr <= 0 || mux_addr > 0x7F)
-		return __scmd_ErrMsg("<switch scan(error), mux addr over range (0x00-0x7F).\r\n");
-
-	if (sm_instance.input_mux.i2c.bus == NULL)
-		return __scmd_ErrMsg("<switch scan(error), not configured. Use 'switch config' first.\r\n");
-
-	slen += sprintf(scmd_msgBuf + slen, "<scan PCA9847 0x%02lX:\r\n", mux_addr);
+	*pSlen += sprintf(scmd_msgBuf + *pSlen, "<scan %s (%s PCA9847 0x%02X):\r\n",
+		tag, bus->info.name, mux_addr);
 
 	for (ch = 0; ch < 8; ch++)
 	{
-		sm_instance.input_mux.addr = (unsigned char)mux_addr;
-		sm_instance.input_mux.i2c.addr = (unsigned char)mux_addr;
-		if (i2c_dev_write_byte(&sm_instance.input_mux.i2c,
-			0x00, (unsigned char)(0x08 | ch)) != i2c_ack)
-		{
-			slen += sprintf(scmd_msgBuf + slen, "  CH%d: mux write fail\r\n", ch);
-			continue;
-		}
+		unsigned char found = 0;
+		unsigned char addr_id;
 
-		slen += sprintf(scmd_msgBuf + slen, "  CH%d: ", ch);
+		if (i2c_dev_write_byte(&mux_dev, 0x00, (unsigned char)(0x08 | ch)) != i2c_ack)
+			continue;
+
+		for (addr_id = 0; addr_id < 8; addr_id++)
 		{
-			unsigned char found = 0;
-			for (addr_id = 0; addr_id < 8; addr_id++)
+			unsigned char dev_addr = (unsigned char)(0x70 | addr_id);
+			unsigned char dummy;
+			if (HAL_I2C_Mem_Read(bus->hw,
+				(uint16_t)(dev_addr << 1), 0x00,
+				I2C_MEMADD_SIZE_8BIT, &dummy, 1, 50) == HAL_OK)
 			{
-				unsigned char dev_addr = (unsigned char)(0x70 | addr_id);
-				unsigned char dummy;
-				if (HAL_I2C_Mem_Read(sm_instance.input_mux.i2c.bus->hw,
-					(uint16_t)(dev_addr << 1), 0x00,
-					I2C_MEMADD_SIZE_8BIT, &dummy, 1, 50) == HAL_OK)
-				{
-					slen += sprintf(scmd_msgBuf + slen, "0x%02X ", dev_addr);
-					found = 1;
-				}
+				found++;
 			}
-			if (!found) slen += sprintf(scmd_msgBuf + slen, "(none)");
 		}
-		slen += sprintf(scmd_msgBuf + slen, "\r\n");
+		if (found == 0) continue;
+
+		total += found;
+		*pSlen += sprintf(scmd_msgBuf + *pSlen, "  CH%d: %d chips", ch, found);
+		if (exp_cnt && exp_cnt[ch] > 0)
+			*pSlen += sprintf(scmd_msgBuf + *pSlen, " %s", (found == exp_cnt[ch]) ? "OK" : "MISMATCH");
+		*pSlen += sprintf(scmd_msgBuf + *pSlen, "\r\n");
 	}
+	return total;
+}
+
+/* switch scan — auto-scan input & output sides, compare with config */
+static scmd_errCode_def __scan(char *pData, unsigned short len)
+{
+	unsigned short slen = 0;
+	unsigned char in_exp[8] = {0};
+	unsigned char out_exp[8] = {0};
+	unsigned char i;
+
+	if (sm_instance.input_mux.i2c.bus == NULL)
+		return __scmd_ErrMsg("<switch scan(error), not configured.\r\n");
+
+	/* build expected counts from config */
+	for (i = 0; i < sm_instance.input_chip_count; i++)
+		in_exp[sm_instance.input_chip_mux_ch[i]]++;
+	for (i = 0; i < sm_instance.output_chip_count; i++)
+		out_exp[sm_instance.output_chip_mux_ch[i]]++;
+
+	scan_side(&slen, "input",
+		sm_instance.input_mux.i2c.bus, sm_instance.input_mux.addr, in_exp);
+	scan_side(&slen, "output",
+		sm_instance.output_mux.i2c.bus, sm_instance.output_mux.addr, out_exp);
 
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
