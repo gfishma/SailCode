@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(platformio run *)",
+      "Bash(pio run *)",
+      "Bash(python tools/serial_monitor.py *)",
+      "Bash(sed -i 's*)",
+      "Bash(cat -A *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(find .claude *)",
+      "Bash(find ~ *)",
+      "Bash(ls -la *)",
+      "Bash(mkdir -p *)",
+      "Bash(tail *)",
+      "Bash(head *)",
+      "Bash(sleep *)",
+      "Bash(which *)",
+      "Bash(where *)"
+    ]
+  }
+}
