@@ -403,6 +403,7 @@ static scmd_errCode_def __reset(char *pData, unsigned short len)
 }
 
 /* helper: scan one PCA9847 side, return chip count per channel */
+/* helper: scan one PCA9847 side, show chip addresses */
 static unsigned char scan_side(unsigned short* pSlen, const char* tag,
 	i2c_bus_class* bus, unsigned char mux_addr,
 	const unsigned char* exp_cnt)
@@ -416,29 +417,33 @@ static unsigned char scan_side(unsigned short* pSlen, const char* tag,
 
 	for (ch = 0; ch < 8; ch++)
 	{
+		unsigned char found_addrs[8];
 		unsigned char found = 0;
-		unsigned char addr_id;
+		unsigned char k;
 
 		if (i2c_dev_write_byte(&mux_dev, 0x00, (unsigned char)(0x08 | ch)) != i2c_ack)
 			continue;
 
-		for (addr_id = 0; addr_id < 8; addr_id++)
+		for (k = 0; k < 8; k++)
 		{
-			unsigned char dev_addr = (unsigned char)(0x70 | addr_id);
+			unsigned char dev_addr = (unsigned char)(0x70 | k);
 			unsigned char dummy;
 			if (HAL_I2C_Mem_Read(bus->hw,
 				(uint16_t)(dev_addr << 1), 0x00,
 				I2C_MEMADD_SIZE_8BIT, &dummy, 1, 50) == HAL_OK)
 			{
+				found_addrs[found] = dev_addr;
 				found++;
 			}
 		}
 		if (found == 0) continue;
 
 		total += found;
-		*pSlen += sprintf(scmd_msgBuf + *pSlen, "  CH%d: %d chips", ch, found);
+		*pSlen += sprintf(scmd_msgBuf + *pSlen, "  CH%d: ", ch);
+		for (k = 0; k < found; k++)
+			*pSlen += sprintf(scmd_msgBuf + *pSlen, "0x%02X ", found_addrs[k]);
 		if (exp_cnt && exp_cnt[ch] > 0)
-			*pSlen += sprintf(scmd_msgBuf + *pSlen, " %s", (found == exp_cnt[ch]) ? "OK" : "MISMATCH");
+			*pSlen += sprintf(scmd_msgBuf + *pSlen, "%s", (found == exp_cnt[ch]) ? "OK" : "MISMATCH");
 		*pSlen += sprintf(scmd_msgBuf + *pSlen, "\r\n");
 	}
 	return total;
