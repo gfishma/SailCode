@@ -200,7 +200,7 @@ void bsp_init()
 	for (uint16_t i = 0; i < i2c_bus_list_qty; i++)
 		i2c_bus_init(&i2c_bus_list[i]);
 
-	// DVM_V2_Init(&DVM_V2);
+	DVM_V2_Init(&DVM_V2);
 	DVM_config();
 	scmd_switch_init_default();
 	scmd_emio_init_default();
