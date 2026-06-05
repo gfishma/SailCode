@@ -41,10 +41,10 @@ scmd_cmd_def scmd_list[] =
 		{.func = scmd_dvm,		.name = "dvm",		.dest = ">dvm help",		.isVisible = 1,},
 		{.func = scmd_switch,	.name = "switch",	.dest = ">switch help",		.isVisible = 1,},
 		{.func = scmd_emio,		.name = "em_io",	.dest = ">em_io help",		.isVisible = 1,},
-	{.func = scmd_em_cvs,	.name = "em_cvs",	.dest = ">em_cvs help",		.isVisible = 1,},
-	{.func = scmd_em_ccs,	.name = "em_ccs",	.dest = ">em_ccs help",		.isVisible = 1,},
-	{.func = scmd_pd,		.name = "pd",		.dest = ">pd help",			.isVisible = 1,},
-	{.func = scmd_em_dmm,	.name = "em_dmm",	.dest = ">em_dmm help",			.isVisible = 1,},
+		{.func = scmd_em_cvs,	.name = "em_cvs",	.dest = ">em_cvs help",		.isVisible = 1,},
+		{.func = scmd_em_ccs,	.name = "em_ccs",	.dest = ">em_ccs help",		.isVisible = 1,},
+		{.func = scmd_pd,		.name = "pd",		.dest = ">pd help",			.isVisible = 1,},
+		{.func = scmd_em_dmm,	.name = "em_dmm",	.dest = ">em_dmm help",		.isVisible = 1,},
 	//		{.func = scmd_w25qxx,	.name = "w25qxx",	.dest = ">w25qxx help",		.isVisible = 1,},
 };
 
