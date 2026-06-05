@@ -594,7 +594,7 @@ static scmd_errCode_def __meas(char *pData, unsigned short len)
 
 	/* read DVM */
 	ret = (int)DVM_V2_GetVolt(&DVM_V2, MEAS_DVM_CH,
-		Dvm_V2_Auto, Dvm_V2_Smp_Time_100MS, &voltage);
+		Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, &voltage);
 
 	/* disconnect */
 	switch_matrix_connect(&sm_instance,
