@@ -608,13 +608,11 @@ static scmd_errCode_def __meas(char *pData, unsigned short len)
 		return scmd_normal;
 	}
 
-t/* format voltage in mV */
+	/* format voltage in mV */
 	{
 		int mv = (int)(voltage * 1000.0f);
 		slen += sprintf(scmd_msgBuf + slen,
-			"<switch meas(ok) X%d %dmV
-", (int)x_val, mv);
-	}
+			"<switch meas(ok) X%d %dmV\r\n", (int)x_val, mv);
 	}
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
