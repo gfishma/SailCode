@@ -6,7 +6,6 @@
  *   switch set(X, Y, O, 1/0)  -- 1=ON(connect), 0=OFF(disconnect)
  *   switch yf set(Y, F, ON/OFF) -- only connect Y→F, no input switching
  *   switch reset               -- turn off all switches
- *   switch meas(X1)            -- auto-route X→T13, read DVM CH2, disconnect
  *   switch config(i2c_1, 0x59, i2c_2, 0x59)
  *   switch info                -- show current configuration
  *   switch help                -- show help
@@ -32,7 +31,6 @@ static scmd_errCode_def __reset(char* pData, unsigned short len);
 static scmd_errCode_def __scan(char* pData, unsigned short len);
 static scmd_errCode_def __yf(char* pData, unsigned short len);
 static scmd_errCode_def __yf_set(char* pData, unsigned short len);
-static scmd_errCode_def __meas(char* pData, unsigned short len);
 
 static switch_matrix_class sm_instance;
 
@@ -45,7 +43,6 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan // auto-scan input+output, compare with config",.isVisible = 1,},
 	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1,F2,ON/OFF)   Y:1-5,7-8 F:1-48", .isVisible = 1,},
-	{.func = __meas,   .name = "meas",   .dest = ">switch meas(X1)              X:1-300  measure via T13,DVM CH2", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -583,79 +580,3 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-/* switch meas(Xn) — auto-route X->T13, read DVM CH2, disconnect */
-#define MEAS_Y     6    /* Y6 bus (reserved for measurement) */
-#define MEAS_T     13   /* T13 -> DVM CH2 */
-#define MEAS_DVM_CH 2
-
-static scmd_errCode_def __meas(char *pData, unsigned short len)
-{
-	char *pNet = pData;
-	char *pEnd;
-	unsigned short slen = 0;
-	long x_val;
-	float voltage;
-	int ret;
-
-	str_deSpace(pData);
-
-	pEnd = strstr(pNet, ")");
-	if (pEnd == NULL)
-		return __scmd_ErrMsg("<switch meas(error), ')' not found.\r\n");
-
-	pNet = strstr(pNet, "(");
-	if (pNet == NULL)
-		return __scmd_ErrMsg("<switch meas(error), '(' not found.\r\n");
-	pNet += 1;
-
-	str_deSpace(pNet);
-
-	if (*pNet != 'X' && *pNet != 'x')
-		return __scmd_ErrMsg("<switch meas(error), expected 'X' prefix.\r\n");
-	pNet++;
-
-	pNet = str_GetHexDec(pNet, pEnd, &x_val);
-	if (pNet == NULL)
-		return __scmd_ErrMsg("<switch meas(error), X value not found.\r\n");
-	if (x_val < 1 || x_val > SM_INPUT_TOTAL)
-		return __scmd_ErrMsg("<switch meas(error), X over range (1-300).\r\n");
-
-	if (sm_instance.input_mux.i2c.bus == NULL)
-		return __scmd_ErrMsg("<switch meas(error), not configured.\r\n");
-
-	/* connect X -> Y2 -> T13 */
-	ret = switch_matrix_connect(&sm_instance,
-		(unsigned short)x_val, MEAS_Y, MEAS_T, 1);
-	if (ret != 0)
-	{
-		slen += sprintf(scmd_msgBuf + slen,
-			"<switch meas(error) connect failed code=%d\r\n", ret);
-		scmd_callback(scmd_msgBuf, slen);
-		return scmd_normal;
-	}
-
-	/* read DVM */
-	ret = (int)DVM_V2_GetVolt(&DVM_V2, MEAS_DVM_CH,
-		Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, &voltage);
-
-	/* disconnect */
-	switch_matrix_connect(&sm_instance,
-		(unsigned short)x_val, MEAS_Y, MEAS_T, 0);
-
-	if (ret != 0)
-	{
-		slen += sprintf(scmd_msgBuf + slen,
-			"<switch meas(error) dvm read failed code=%d\r\n", ret);
-		scmd_callback(scmd_msgBuf, slen);
-		return scmd_normal;
-	}
-
-	/* format voltage in mV */
-	{
-		int mv = (int)(voltage * 1000.0f);
-		slen += sprintf(scmd_msgBuf + slen,
-			"<switch meas(ok) X%d %dmV\r\n", (int)x_val, mv);
-	}
-	scmd_callback(scmd_msgBuf, slen);
-	return scmd_normal;
-}

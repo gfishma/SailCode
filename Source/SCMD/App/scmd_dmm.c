@@ -9,7 +9,10 @@
 #include "Module_SwitchMatrix.h"
 #include "Module_DVM_V2.h"
 
+extern scmd_class scmd_ctrl;
 extern M_DVM_V2_Def DVM_V2;
+
+extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
 
 #define DMM_Y       6
 #define DMM_T       13
@@ -18,6 +21,19 @@ extern M_DVM_V2_Def DVM_V2;
 static switch_matrix_class* sm = NULL;
 
 void scmd_dmm_set_switch_matrix(switch_matrix_class* p) { sm = p; }
+
+static scmd_errCode_def __help(char *pData, unsigned short len);
+
+static scmd_cmd_def dmm_func[] =
+{
+	{.func = __help, .name = "help", .dest = ">em_dmm help", .isVisible = 1,},
+};
+
+static scmd_class dmm_ctrler =
+{
+	.cmdList = dmm_func, .cmdQty = (sizeof(dmm_func)/sizeof(dmm_func[0])),
+	.stringLenthMax = 32, .sfunc_flag = 1,
+};
 
 scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 {
@@ -28,6 +44,15 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 	int ret;
 
 	str_deSpace(pData);
+
+	/* check for sub-command */
+	if (strncmp(pData, "help", 4) == 0)
+	{
+		dmm_ctrler.msgSource = scmd_ctrl.msgSource;
+		__scmd_help(&dmm_ctrler, pData, len);
+		return scmd_normal;
+	}
+
 	pEnd = strstr(pNet, ")");
 	if (pEnd == NULL)
 		return __scmd_ErrMsg("<em_dmm(error), ')' not found.\r\n");
@@ -78,5 +103,12 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 			"<em_dmm(ok) X%d %dmV\r\n", (int)x_val, mv);
 	}
 	scmd_callback(scmd_msgBuf, slen);
+	return scmd_normal;
+}
+
+static scmd_errCode_def __help(char *pData, unsigned short len)
+{
+	dmm_ctrler.msgSource = scmd_ctrl.msgSource;
+	__scmd_help(&dmm_ctrler, pData, len);
 	return scmd_normal;
 }
