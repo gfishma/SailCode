@@ -13,6 +13,7 @@
  */
 
 #include "scmd_switch.h"
+#include "scmd_dmm.h"
 #include "Module_SwitchMatrix.h"
 #include "Module_DVM_V2.h"
 
@@ -108,6 +109,8 @@ void scmd_switch_init_default(void)
 		int ret = switch_matrix_init(&sm_instance);
 		if (ret != 0)
 			printf("<switch init(default) error code=%d\r\n", ret);
+
+		scmd_dmm_set_switch_matrix(&sm_instance);
 	}
 }
 
