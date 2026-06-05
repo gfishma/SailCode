@@ -21,6 +21,7 @@ extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
 
 static scmd_errCode_def __help(char *pData, unsigned short len);
 static scmd_errCode_def __info(char *pData, unsigned short len);
+static scmd_errCode_def __scan(char *pData, unsigned short len);
 static scmd_errCode_def __set(char* pData, unsigned short len);
 static scmd_errCode_def __read(char* pData, unsigned short len);
 static scmd_errCode_def __init(char* pData, unsigned short len);
@@ -36,6 +37,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __reset, .name = "reset", .dest = ">em_io reset",                             .isVisible = 1,},
 	{.func = __set,   .name = "set",   .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
 	{.func = __read,  .name = "read",  .dest = ">em_io read(io1) or read([io1],[io2], ...)",         .isVisible = 1,},
+	{.func = __scan,  .name = "scan",  .dest = ">em_io scan // detect CAT9555 chips",               .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -95,12 +97,90 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 	for (i = 0; i < EMIO_CHIP_COUNT; i++)
 	{
 		const char* bus_name = (i < 3) ? "I2C2" : "I2C1";
-		/* 1-based channel display: 第7通道=index 6, 第1通道=index 0 */
 		unsigned char mux_ch = (i < 3) ? 7 : 1;
 		unsigned char addr = 0x20 + (i % 3);
-		slen += sprintf(scmd_msgBuf + slen, "  IO %2d-%2d: %s CH%d, CAT9555 0x%02X\r\n",
+		unsigned short state;
+		int ret;
+
+		/* select mux and read actual output state */
+		if (i < 3)
+			ret = pca9847_select_channel(&emio_instance.mux_i2c2, 6);
+		else
+			ret = pca9847_select_channel(&emio_instance.mux_i2c1, 0);
+
+		if (ret == 0)
+			ret = cat9555_read_pin_inHex(&emio_instance.chip[i], &state);
+
+		slen += sprintf(scmd_msgBuf + slen, "  IO %2d-%2d: %s CH%d 0x%02X",
 			i * 16 + 1, (i + 1) * 16, bus_name, mux_ch, addr);
+		if (ret == 0)
+			slen += sprintf(scmd_msgBuf + slen, " = 0x%04X\r\n", state);
+		else
+			slen += sprintf(scmd_msgBuf + slen, " (read err %d)\r\n", ret);
 	}
+
+	pca9847_disable_all(&emio_instance.mux_i2c1);
+	pca9847_disable_all(&emio_instance.mux_i2c2);
+
+	scmd_callback(scmd_msgBuf, slen);
+	return scmd_normal;
+}
+
+/* em_io scan — detect CAT9555 chips on I2C1 and I2C2 */
+static scmd_errCode_def __scan(char *pData, unsigned short len)
+{
+	unsigned short slen = 0;
+	unsigned char chip_id;
+	int ret;
+
+	scmd_ctrler.msgSource = scmd_ctrl.msgSource;
+
+	slen += sprintf(scmd_msgBuf + slen, "<em_io scan:\r\n");
+
+	/* I2C2 PCA9847 CH7: chips 0-2 */
+	slen += sprintf(scmd_msgBuf + slen, "  I2C2 PCA9847 CH7:\r\n");
+	ret = pca9847_select_channel(&emio_instance.mux_i2c2, 6);
+	if (ret != 0)
+	{
+		slen += sprintf(scmd_msgBuf + slen, "    mux select fail\r\n");
+	}
+	else
+	{
+		for (chip_id = 0; chip_id < 3; chip_id++)
+		{
+			unsigned char addr = 0x20 | chip_id;
+			unsigned char dummy;
+			int r = i2c_dev_read_byte(
+				(i2c_dev_class*)&emio_instance.chip[chip_id].i2c,
+				0x00, &dummy);
+			slen += sprintf(scmd_msgBuf + slen, "    0x%02X: %s\r\n",
+				addr, (r == i2c_ack) ? "OK" : "no response");
+		}
+	}
+
+	/* I2C1 PCA9847 CH1: chips 3-5 */
+	slen += sprintf(scmd_msgBuf + slen, "  I2C1 PCA9847 CH1:\r\n");
+	ret = pca9847_select_channel(&emio_instance.mux_i2c1, 0);
+	if (ret != 0)
+	{
+		slen += sprintf(scmd_msgBuf + slen, "    mux select fail\r\n");
+	}
+	else
+	{
+		for (chip_id = 3; chip_id < 6; chip_id++)
+		{
+			unsigned char addr = 0x20 | (chip_id % 3);
+			unsigned char dummy;
+			int r = i2c_dev_read_byte(
+				(i2c_dev_class*)&emio_instance.chip[chip_id].i2c,
+				0x00, &dummy);
+			slen += sprintf(scmd_msgBuf + slen, "    0x%02X: %s\r\n",
+				addr, (r == i2c_ack) ? "OK" : "no response");
+		}
+	}
+
+	pca9847_disable_all(&emio_instance.mux_i2c1);
+	pca9847_disable_all(&emio_instance.mux_i2c2);
 
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
