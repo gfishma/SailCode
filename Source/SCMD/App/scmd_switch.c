@@ -40,11 +40,11 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __help,   .name = "help",   .dest = ">switch help",                                   .isVisible = 1,},
 	{.func = __info,   .name = "info",   .dest = ">switch info",                                   .isVisible = 1,},
 	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 1,},
-	{.func = __set,    .name = "set",    .dest = ">switch set(X1,Y,T,ON/OFF) X:1-300 Y:1-5/7-8 T:1-48 (Y6=meas)", .isVisible = 1,},
+	{.func = __set,    .name = "set",    .dest = ">switch set(X1,Y2,T13,ON/OFF)  X:1-300 Y:1-5,7-8 T:1-48", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan(mux_addr) // scan all CH and ADG2128",.isVisible = 1,},
-	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y,F,ON/OFF) Y:1-5/7-8 F:1-48 (Y6=meas)", .isVisible = 1,},
-	{.func = __meas,   .name = "meas",   .dest = ">switch meas(X1) // measure X voltage via T13/DVM CH2", .isVisible = 1,},
+	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1,F2,ON/OFF)   Y:1-5,7-8 F:1-48", .isVisible = 1,},
+	{.func = __meas,   .name = "meas",   .dest = ">switch meas(X1)              X:1-300  measure via T13,DVM CH2", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -608,14 +608,13 @@ static scmd_errCode_def __meas(char *pData, unsigned short len)
 		return scmd_normal;
 	}
 
-	/* format voltage without %f */
+t/* format voltage in mV */
 	{
-		float v_abs = (voltage < 0.0f) ? -voltage : voltage;
-		unsigned short v_int = (unsigned short)v_abs;
-		unsigned short v_frac = (unsigned short)((v_abs - (float)v_int) * 1000.0f + 0.5f);
+		int mv = (int)(voltage * 1000.0f);
 		slen += sprintf(scmd_msgBuf + slen,
-			"<switch meas(ok) X%d %c%d.%03dV\r\n",
-			(int)x_val, (voltage < 0.0f) ? '-' : ' ', v_int, v_frac);
+			"<switch meas(ok) X%d %dmV
+", (int)x_val, mv);
+	}
 	}
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
