@@ -450,6 +450,8 @@ static scmd_errCode_def __config(char *pData, unsigned short len)
 	if (chip_start != chip_end)
 		return __scmd_ErrMsg("<em_io config(error), range must be within one chip (16 IOs)\r\n");
 	chip_id = chip_start;
+	if (chip_id < 3)
+		return __scmd_ErrMsg("<em_io config(error), IO 1-48 reserved for internal use\r\n");
 
 	pNet = (char*)strstr(pNet, ","); pNet += 1;
 	pNet = __scmd_getValidData(pNet, pEnd, "i2c_", &i2c_idx);
