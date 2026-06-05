@@ -58,7 +58,7 @@ static scmd_cmd_def cvs_func[] =
 {
 	{.func = __cvs_help, .name = "help", .dest = ">em_cvs help",                                        .isVisible = 1,},
 	{.func = __cvs_info, .name = "info", .dest = ">em_cvs info",                                        .isVisible = 1,},
-	{.func = __cvs_set,  .name = "set",  .dest = ">em_cvs set(LP/HP/NP, V)  LP:0-5V HP:0-35V NP:0~-5V", .isVisible = 1,},
+	{.func = __cvs_set,  .name = "set",  .dest = ">em_cvs set(LP/HP/NP, x.xV)  LP:0-5V HP:0-35V NP:0~-5V", .isVisible = 1,},
 };
 
 static scmd_class cvs_ctrler =
@@ -165,7 +165,7 @@ static scmd_cmd_def ccs_func[] =
 {
 	{.func = __ccs_help, .name = "help", .dest = ">em_ccs help",                                        .isVisible = 1,},
 	{.func = __ccs_info, .name = "info", .dest = ">em_ccs info",                                        .isVisible = 1,},
-	{.func = __ccs_set,  .name = "set",  .dest = ">em_ccs set(mA)  sign=polarity, auto range",          .isVisible = 1,},
+	{.func = __ccs_set,  .name = "set",  .dest = ">em_ccs set(x.xxmA)  sign=polarity, auto range",        .isVisible = 1,},
 	{.func = __ccs_read, .name = "read", .dest = ">em_ccs read   readback via DVM CH4",                .isVisible = 1,},
 };
 
