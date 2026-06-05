@@ -402,29 +402,52 @@ static scmd_errCode_def __scan(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-/* em_io config(io, i2c_x, mux_ch, addr) — io maps to chip index automatically */
+/* em_io config(io_range, i2c_x, mux_ch, addr) — e.g. config(1-16, i2c_2, 6, 0x20) */
 static scmd_errCode_def __config(char *pData, unsigned short len)
 {
-	char *pNet = pData, *pEnd;
+	char *pNet = pData, *pEnd, *pDash;
 	unsigned short qty = 1;
 	unsigned short slen = 0;
-	long io_num, i2c_idx, mux_ch, addr;
-	unsigned char chip_id;
+	long io_start, io_end, i2c_idx, mux_ch, addr;
+	unsigned char chip_id, chip_start, chip_end;
 
 	str_deSpace(pData);
 	pEnd = strstr(pNet, ")");
 	if (pEnd == NULL) return __scmd_ErrMsg("<em_io config(error), ')' not found.\r\n");
 	qty += str_CharQty(pNet, ',');
-	if (qty != 4) return __scmd_ErrMsg("<em_io config(error), need 4 params: io, i2c_x, mux_ch, addr\r\n");
+	if (qty != 4) return __scmd_ErrMsg("<em_io config(error), need 4 params: io_range, i2c_x, mux_ch, addr\r\n");
 
 	pNet = strstr(pNet, "(");
 	if (pNet == NULL) return __scmd_ErrMsg("<em_io config(error), '(' not found.\r\n");
 	pNet += 1;
 
-	pNet = str_GetHexDec(pNet, pEnd, &io_num);
-	if (pNet == NULL || io_num < 1 || io_num > EMIO_TOTAL_IO)
-		return __scmd_ErrMsg("<em_io config(error), io 1-96\r\n");
-	chip_id = (unsigned char)((io_num - 1) / EMIO_IO_PER_CHIP);
+	/* parse IO: single (e.g. "1") or range (e.g. "1-16") */
+	pDash = (char*)strstr(pNet, "-");
+	if (pDash != NULL && pDash < pEnd)
+	{
+		/* range format: "start-end" */
+		*pDash = '\0';
+		pNet = str_GetHexDec(pNet, pEnd, &io_start);
+		*pDash = '-';
+		if (pNet == NULL) return __scmd_ErrMsg("<em_io config(error), range start\r\n");
+		pNet = str_GetHexDec(pDash + 1, pEnd, &io_end);
+		if (pNet == NULL) return __scmd_ErrMsg("<em_io config(error), range end\r\n");
+	}
+	else
+	{
+		/* single IO, auto-map to range */
+		pNet = str_GetHexDec(pNet, pEnd, &io_start);
+		if (pNet == NULL) return __scmd_ErrMsg("<em_io config(error), io number\r\n");
+		io_end = io_start;
+	}
+	if (io_start < 1 || io_end > EMIO_TOTAL_IO || io_start > io_end)
+		return __scmd_ErrMsg("<em_io config(error), io range 1-96\r\n");
+
+	chip_start = (unsigned char)((io_start - 1) / EMIO_IO_PER_CHIP);
+	chip_end   = (unsigned char)((io_end   - 1) / EMIO_IO_PER_CHIP);
+	if (chip_start != chip_end)
+		return __scmd_ErrMsg("<em_io config(error), range must be within one chip (16 IOs)\r\n");
+	chip_id = chip_start;
 
 	pNet = (char*)strstr(pNet, ","); pNet += 1;
 	pNet = __scmd_getValidData(pNet, pEnd, "i2c_", &i2c_idx);
