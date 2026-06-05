@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "serial": {
+      "command": "C:/Users/10631/.platformio/penv/Scripts/python.exe",
+      "args": ["tools/serial_mcp.py"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
