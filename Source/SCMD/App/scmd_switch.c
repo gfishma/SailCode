@@ -4,7 +4,7 @@
  * ADG2128 Switch Matrix serial command handler
  * Command format:
  *   switch set(X, Y, O, 1/0)  -- 1=ON(connect), 0=OFF(disconnect)
- *   switch yf set(Y, F, ON/OFF) -- only connect Y→F, no input switching
+ *   switch yf set(Y, T, ON/OFF) -- only connect Y→T, no input switching
  *   switch reset               -- turn off all switches
  *   switch info                -- show current configuration
  *   switch help                -- show help
@@ -41,7 +41,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __set,    .name = "set",    .dest = ">switch set(X1,Y2,T13,ON/OFF)  X:1-300 Y:1-5,7-8 T:1-48", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan // auto-scan input+output, compare with config",.isVisible = 1,},
-	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1,F2,ON/OFF)   Y:1-5,7-8 F:1-48", .isVisible = 1,},
+	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1,T2,ON/OFF)   Y:1-5,7-8 T:1-48", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
@@ -474,7 +474,7 @@ static scmd_errCode_def __scan(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-/* switch yf set(Y, F, ON/OFF) — only connect Y→F, no input switching */
+/* switch yf set(Y, F, ON/OFF) — only connect Y→T, no input switching */
 static scmd_errCode_def __yf(char *pData, unsigned short len)
 {
 	str_deSpace(pData);
@@ -486,7 +486,7 @@ static scmd_errCode_def __yf(char *pData, unsigned short len)
 		return __yf_set(pData + 3, len - 3);
 	}
 
-	return __scmd_ErrMsg("<switch yf(error), unknown sub-command. Use: yf set(Y,F,ON/OFF)\r\n");
+	return __scmd_ErrMsg("<switch yf(error), unknown sub-command. Use: yf set(Y,T,ON/OFF)\r\n");
 }
 
 static scmd_errCode_def __yf_set(char *pData, unsigned short len)
@@ -526,18 +526,18 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 	if (y_val == 6)
 		return __scmd_ErrMsg("<switch set(error), Y6 reserved for measurement, use Y1-5/7-8.\r\n");
 
-	/* parse F */
+	/* parse T */
 	{
 		pNet = (char*)strstr(pNet, ",");
 		if (pNet == NULL || pNet >= pEnd)
-			return __scmd_ErrMsg("<switch yf set(error), ',' not found before F.\r\n");
+			return __scmd_ErrMsg("<switch yf set(error), ',' not found before T.\r\n");
 		pNet += 1;
 		SKIP_LETTER(pNet);
 		pNet = str_GetHexDec(pNet, pEnd, &f_val);
-		if (pNet == NULL) return __scmd_ErrMsg("<switch yf set(error), F not found.\r\n");
+		if (pNet == NULL) return __scmd_ErrMsg("<switch yf set(error), T not found.\r\n");
 	}
 	if (f_val < 1 || f_val > SM_OUTPUT_TOTAL)
-		return __scmd_ErrMsg("<switch yf set(error), F over range (1-48).\r\n");
+		return __scmd_ErrMsg("<switch yf set(error), T over range (1-48).\r\n");
 
 #undef SKIP_LETTER
 
@@ -571,7 +571,7 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 	}
 	else
 	{
-		slen += sprintf(scmd_msgBuf + slen, "<switch yf set(ok) Y%d-F%d %s\r\n",
+		slen += sprintf(scmd_msgBuf + slen, "<switch yf set(ok) Y%d-T%d %s\r\n",
 			(int)y_val, (int)f_val, (on_off ? "ON" : "OFF"));
 	}
 
