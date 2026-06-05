@@ -7,7 +7,9 @@
  *   em_io set([io1, lv1], [io2, lv2], ...)  -- multi IO set
  *   em_io read(io_num)             -- single IO read
  *   em_io read([io1],[io2], ...)   -- multi IO read
- *   em_io info                     -- show configuration
+ *   em_io scan                     -- detect CAT9555 chips
+ *   em_io config(1-16, i2c_x, ch, 0x20)  -- remap IO range to chip
+ *   em_io info                     -- show IO states
  *   em_io help                     -- show help
  */
 
@@ -39,7 +41,7 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __set,   .name = "set",   .dest = ">em_io set(io1, 0/1) or set([io1, 1],[io2, 0], ...)", .isVisible = 1,},
 	{.func = __read,  .name = "read",  .dest = ">em_io read(io1) or read([io1],[io2], ...)",         .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">em_io scan",                                       .isVisible = 1,},
-	{.func = __config, .name = "config", .dest = ">em_io config(io, i2c_x, mux_ch, addr)",             .isVisible = 1,},
+	{.func = __config, .name = "config", .dest = ">em_io config(IO_start-IO_end, i2c_x, mux_ch, addr) // IO:1-96, mux:0-7, addr:0x20-0x27", .isVisible = 1,},
 };
 
 static scmd_class scmd_ctrler =
