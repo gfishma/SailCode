@@ -447,8 +447,9 @@ static scmd_errCode_def __config(char *pData, unsigned short len)
 	emio_instance.chip[(unsigned char)chip_id].i2c.bus = &i2c_bus_list[i2c_idx];
 
 	slen += sprintf(scmd_msgBuf + slen,
-		"<em_io config(ok) chip %d -> %s CH%d 0x%02X\r\n",
-		(int)chip_id, emio_bus_name(emio_instance.chip_bus[chip_id]),
+		"<em_io config(ok) chip %d (IO %d-%d) -> %s CH%d 0x%02X\r\n",
+		(int)chip_id, (int)chip_id * 16 + 1, ((int)chip_id + 1) * 16,
+		emio_bus_name(emio_instance.chip_bus[chip_id]),
 		(int)mux_ch, (int)addr);
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
