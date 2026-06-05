@@ -21,7 +21,7 @@
 #include "scmd_dvm.h"
 #include "scmd_switch.h"
 #include "scmd_emio.h"
-#include "scmd_dac5667.h"
+#include "scmd_em_cvs_ccs.h"
 #include "scmd_pd.h"
 #include "w25qxx.h"
 
@@ -204,7 +204,7 @@ void bsp_init()
 	DVM_config();
 	scmd_switch_init_default();
 	scmd_emio_init_default();
-	scmd_dac5667_init_default();
+	scmd_em_cvs_ccs_init_default();
 	scmd_pd_init_default();
 	ntc_init(&ntc_1, 10000, 3976);
 

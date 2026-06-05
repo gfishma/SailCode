@@ -1,5 +1,5 @@
 /*
- * scmd_dac5667.c
+ * scmd_em_cvs_ccs.c
  *
  * AD5667 CVS/CCS command handlers:
  *   em_cvs set(LP/HP/NP, V)  -- constant voltage source
@@ -9,7 +9,7 @@
  *   em_ccs info               -- CCS config
  */
 
-#include "scmd_dac5667.h"
+#include "scmd_em_cvs_ccs.h"
 #include "Module_DAC5667.h"
 #include "scmd_emio.h"
 
@@ -40,7 +40,7 @@ static const char* mode_name(dac5667_path_def path)
 	}
 }
 
-void scmd_dac5667_init_default(void)
+void scmd_em_cvs_ccs_init_default(void)
 {
 	int ret;
 	ret = dac5667_init(&dac5667_module, &emio_instance.chip[0], &emio_instance.chip[2]);

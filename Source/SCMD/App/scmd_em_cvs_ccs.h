@@ -1,5 +1,5 @@
 /*
- * scmd_dac5667.h
+ * scmd_em_cvs_ccs.h
  *
  * AD5667 CVS/CCS command handlers
  */
@@ -11,6 +11,6 @@
 
 scmd_errCode_def scmd_em_cvs(char* pData, unsigned short len);
 scmd_errCode_def scmd_em_ccs(char* pData, unsigned short len);
-void scmd_dac5667_init_default(void);
+void scmd_em_cvs_ccs_init_default(void);
 
 #endif /* SCMD_APP_SCMD_DAC5667_H_ */

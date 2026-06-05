@@ -17,7 +17,7 @@
 #include "scmd_w25qxx.h"
 #include "scmd_switch.h"
 #include "scmd_emio.h"
-#include "scmd_dac5667.h"
+#include "scmd_em_cvs_ccs.h"
 #include "scmd_pd.h"
 
 extern gpio_class led;
