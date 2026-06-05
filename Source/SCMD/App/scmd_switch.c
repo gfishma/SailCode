@@ -6,7 +6,6 @@
  *   switch set(X, Y, O, 1/0)  -- 1=ON(connect), 0=OFF(disconnect)
  *   switch yf set(Y, F, ON/OFF) -- only connect Y→F, no input switching
  *   switch reset               -- turn off all switches
- *   switch config(i2c_1, 0x59, i2c_2, 0x59)
  *   switch info                -- show current configuration
  *   switch help                -- show help
  */
@@ -38,7 +37,7 @@ static scmd_cmd_def scmd_func[] =
 {
 	{.func = __help,   .name = "help",   .dest = ">switch help",                                   .isVisible = 1,},
 	{.func = __info,   .name = "info",   .dest = ">switch info",                                   .isVisible = 1,},
-	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 1,},
+	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 0,},
 	{.func = __set,    .name = "set",    .dest = ">switch set(X1,Y2,T13,ON/OFF)  X:1-300 Y:1-5,7-8 T:1-48", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan // auto-scan input+output, compare with config",.isVisible = 1,},
