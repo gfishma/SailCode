@@ -294,7 +294,7 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	if (y_val < 1 || y_val > SM_Y_QTY)
 		return __scmd_ErrMsg("<switch set(error), Y over range (1-8).\r\n");
 	//if (y_val == 6)
-		return __scmd_ErrMsg("<switch set(error), Y6 reserved for measurement, use Y1-5/7-8.\r\n");
+		//return __scmd_ErrMsg("Y6 reserved for measurement, use Y1-5/7-8.\r\n");
 
 	/* parse T */
 	{
@@ -486,7 +486,7 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 	if (y_val < 1 || y_val > SM_Y_QTY)
 		return __scmd_ErrMsg("<switch yf set(error), Y over range (1-8).\r\n");
 	//if (y_val == 6)
-		return __scmd_ErrMsg("<switch yf set(error), Y6 reserved for measurement, use Y1-5/7-8.\r\n");
+		//return __scmd_ErrMsg("Y6 reserved for measurement, use Y1-5/7-8.\r\n");
 
 	/* parse F */
 	{
