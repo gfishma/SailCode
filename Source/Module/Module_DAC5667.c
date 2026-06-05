@@ -11,10 +11,15 @@
 extern i2c_bus_class i2c_bus_list[];
 extern M_DVM_V2_Def DVM_V2;
 
-/* get mux channel for a chip from EMIO config */
-static unsigned char emio_mux_ch(unsigned char chip_idx)
+/* select PCA9847 channel for a chip using EMIO's mux config */
+static int dac_emio_select_chip(unsigned char chip_idx)
 {
-	return emio_instance.chip_mux[chip_idx];
+	if (emio_instance.chip_bus[chip_idx] == emio_instance.mux_i2c1.i2c.bus)
+		return pca9847_select_channel(&emio_instance.mux_i2c1,
+			emio_instance.chip_mux[chip_idx]);
+	else
+		return pca9847_select_channel(&emio_instance.mux_i2c2,
+			emio_instance.chip_mux[chip_idx]);
 }
 
 int dac5667_init(dac5667_module_class* self, cat9555_class* chip0, cat9555_class* chip2)
@@ -59,13 +64,13 @@ static int check_path(pca9847_class* mux, cat9555_class* chip0, cat9555_class* c
 		return -1;
 
 	/* select chip0 mux → read IO7 */
-	ret = pca9847_select_channel(mux, emio_mux_ch(0));
+	ret = dac_emio_select_chip(0);
 	if (ret != 0) return -2;
 	ret = cat9555_read_pin(chip0, DAC5667_IO7_PIN, pIO7);
 	if (ret != 0) return -3;
 
 	/* select chip2 mux → read IO33 */
-	ret = pca9847_select_channel(mux, emio_mux_ch(2));
+	ret = dac_emio_select_chip(2);
 	if (ret != 0) return -4;
 	ret = cat9555_read_pin(chip2, DAC5667_IO33_PIN, pIO33);
 	if (ret != 0) return -5;
@@ -169,7 +174,7 @@ int dac5667_set_current(dac5667_module_class* self, float current_ma)
 	mux_ch = (current_ma >= 0.0f) ? DAC5667_CCS_MUX_POS : DAC5667_CCS_MUX_NEG;
 
 	/* select CH7 for CAT9555 chip0 */
-	ret = pca9847_select_channel(&self->mux, emio_mux_ch(0));
+	ret = dac_emio_select_chip(0);
 	if (ret != 0) return -2;
 
 	/* disable MUX first, then configure IOs */
@@ -212,7 +217,7 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 	if (!self->io_chip0 || !pCurrent_ma)
 		return -1;
 
-	ret = pca9847_select_channel(&self->mux, emio_mux_ch(0));
+	ret = dac_emio_select_chip(0);
 	if (ret != 0) return -2;
 
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, &io1) != 0) return -3;

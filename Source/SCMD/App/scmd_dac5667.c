@@ -76,14 +76,23 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 	scmd_ctrler.msgSource = scmd_ctrl.msgSource;
 
 	slen += sprintf(scmd_msgBuf + slen, "<dac5667 info:\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  AD5667RBRMZ-1 on I2C2 PCA9847 CH2, addr 0x0C\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  AD5667RBRMZ-1 on I2C2 PCA9847 CH2, addr 0x0F\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  DAC B output, internal 2.5V ref, 16-bit\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  V (normal):    0~5V   IO7=0 IO33=0\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  A (amplified): 0~35V  IO7=1 IO33=0\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  N (negative):  0~-5V  IO7=0 IO33=1\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  DAC A → CCS via IO1-IO5, I=VDAC/R\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  DAC A -> CCS via IO1-IO5, I=VDAC/R\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  IO5=MUX_EN IO4/3=MUX_A1/A0(S1=pos S2=neg) IO2/1=range\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  Range: 00=100R(50mA) 01=499R(10mA) 10=10K(0.5mA) 11=1M(5uA)\r\n");
+	{
+		unsigned char c0 = 0, c2 = 2;
+		slen += sprintf(scmd_msgBuf + slen, "  IO mapping (chip %d): IO1-5,IO7 -> %s CH%d 0x%02X\r\n",
+			c0, (emio_instance.chip_bus[c0] == &i2c_bus_list[0]) ? "I2C1" : "I2C2",
+			emio_instance.chip_mux[c0], 0x20 | emio_instance.chip[c0].id);
+		slen += sprintf(scmd_msgBuf + slen, "  IO mapping (chip %d): IO33    -> %s CH%d 0x%02X\r\n",
+			c2, (emio_instance.chip_bus[c2] == &i2c_bus_list[0]) ? "I2C1" : "I2C2",
+			emio_instance.chip_mux[c2], 0x20 | emio_instance.chip[c2].id);
+	}
 
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
