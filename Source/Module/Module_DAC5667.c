@@ -6,9 +6,16 @@
 
 #include "Module_DAC5667.h"
 #include "Module_DVM_V2.h"
+#include "scmd_emio.h"
 
 extern i2c_bus_class i2c_bus_list[];
 extern M_DVM_V2_Def DVM_V2;
+
+/* get mux channel for a chip from EMIO config */
+static unsigned char emio_mux_ch(unsigned char chip_idx)
+{
+	return emio_instance.chip_mux[chip_idx];
+}
 
 int dac5667_init(dac5667_module_class* self, cat9555_class* chip0, cat9555_class* chip2)
 {
@@ -41,8 +48,7 @@ int dac5667_init(dac5667_module_class* self, cat9555_class* chip0, cat9555_class
 }
 
 /*
- * Read IO7/IO33 state via PCA9847 CH7.
- * Returns 0 on success, <0 on error.
+ * Read IO7 (chip0) and IO33 (chip2) via per-chip mux config.
  */
 static int check_path(pca9847_class* mux, cat9555_class* chip0, cat9555_class* chip2,
 	unsigned char* pIO7, unsigned char* pIO33)
@@ -52,14 +58,17 @@ static int check_path(pca9847_class* mux, cat9555_class* chip0, cat9555_class* c
 	if (!chip0 || !chip2)
 		return -1;
 
-	ret = pca9847_select_channel(mux, DAC5667_EMIO_MUX_CH);
+	/* select chip0 mux → read IO7 */
+	ret = pca9847_select_channel(mux, emio_mux_ch(0));
 	if (ret != 0) return -2;
-
 	ret = cat9555_read_pin(chip0, DAC5667_IO7_PIN, pIO7);
 	if (ret != 0) return -3;
 
-	ret = cat9555_read_pin(chip2, DAC5667_IO33_PIN, pIO33);
+	/* select chip2 mux → read IO33 */
+	ret = pca9847_select_channel(mux, emio_mux_ch(2));
 	if (ret != 0) return -4;
+	ret = cat9555_read_pin(chip2, DAC5667_IO33_PIN, pIO33);
+	if (ret != 0) return -5;
 
 	return 0;
 }
@@ -160,7 +169,7 @@ int dac5667_set_current(dac5667_module_class* self, float current_ma)
 	mux_ch = (current_ma >= 0.0f) ? DAC5667_CCS_MUX_POS : DAC5667_CCS_MUX_NEG;
 
 	/* select CH7 for CAT9555 chip0 */
-	ret = pca9847_select_channel(&self->mux, DAC5667_EMIO_MUX_CH);
+	ret = pca9847_select_channel(&self->mux, emio_mux_ch(0));
 	if (ret != 0) return -2;
 
 	/* disable MUX first, then configure IOs */
@@ -203,7 +212,7 @@ int dac5667_read_current(dac5667_module_class* self, float* pCurrent_ma)
 	if (!self->io_chip0 || !pCurrent_ma)
 		return -1;
 
-	ret = pca9847_select_channel(&self->mux, DAC5667_EMIO_MUX_CH);
+	ret = pca9847_select_channel(&self->mux, emio_mux_ch(0));
 	if (ret != 0) return -2;
 
 	if (cat9555_read_pin(self->io_chip0, DAC5667_CCS_IO1_PIN, &io1) != 0) return -3;
