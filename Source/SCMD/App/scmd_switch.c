@@ -538,7 +538,7 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 }
 
 /* switch meas(Xn) — auto-route X->T13, read DVM CH2, disconnect */
-#define MEAS_Y     2    /* Y2 bus */
+#define MEAS_Y     8    /* Y8 bus (reserved for measurement) */
 #define MEAS_T     13   /* T13 -> DVM CH2 */
 #define MEAS_DVM_CH 2
 
