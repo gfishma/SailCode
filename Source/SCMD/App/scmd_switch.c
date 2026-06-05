@@ -40,10 +40,10 @@ static scmd_cmd_def scmd_func[] =
 	{.func = __help,   .name = "help",   .dest = ">switch help",                                   .isVisible = 1,},
 	{.func = __info,   .name = "info",   .dest = ">switch info",                                   .isVisible = 1,},
 	{.func = __config, .name = "config", .dest = ">switch config(i2c_1, 0x59, i2c_2, 0x59)",       .isVisible = 1,},
-	{.func = __set,    .name = "set",    .dest = ">switch set(X1, Y2, T13, ON/OFF) // X:1-300 Y:1-8 T:1-48", .isVisible = 1,},
+	{.func = __set,    .name = "set",    .dest = ">switch set(X1,Y,T,ON/OFF) X:1-300 Y:1-5/7-8 T:1-48 (Y6=meas)", .isVisible = 1,},
 	{.func = __reset,  .name = "reset",  .dest = ">switch reset",                                   .isVisible = 1,},
 	{.func = __scan,   .name = "scan",   .dest = ">switch scan(mux_addr) // scan all CH and ADG2128",.isVisible = 1,},
-	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y1, F2, ON/OFF) // Y:1-8 F:1-48", .isVisible = 1,},
+	{.func = __yf,     .name = "yf",     .dest = ">switch yf set(Y,F,ON/OFF) Y:1-5/7-8 F:1-48 (Y6=meas)", .isVisible = 1,},
 	{.func = __meas,   .name = "meas",   .dest = ">switch meas(X1) // measure X voltage via T13/DVM CH2", .isVisible = 1,},
 };
 
@@ -293,6 +293,8 @@ static scmd_errCode_def __set(char *pData, unsigned short len)
 	}
 	if (y_val < 1 || y_val > SM_Y_QTY)
 		return __scmd_ErrMsg("<switch set(error), Y over range (1-8).\r\n");
+	if (y_val == 6)
+		return __scmd_ErrMsg("<switch set(error), Y6 reserved for measurement, use Y1-5/7-8.\r\n");
 
 	/* parse T */
 	{
@@ -483,6 +485,8 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 	if (pNet == NULL) return __scmd_ErrMsg("<switch yf set(error), Y not found.\r\n");
 	if (y_val < 1 || y_val > SM_Y_QTY)
 		return __scmd_ErrMsg("<switch yf set(error), Y over range (1-8).\r\n");
+	if (y_val == 6)
+		return __scmd_ErrMsg("<switch yf set(error), Y6 reserved for measurement, use Y1-5/7-8.\r\n");
 
 	/* parse F */
 	{
@@ -538,7 +542,7 @@ static scmd_errCode_def __yf_set(char *pData, unsigned short len)
 }
 
 /* switch meas(Xn) — auto-route X->T13, read DVM CH2, disconnect */
-#define MEAS_Y     8    /* Y8 bus (reserved for measurement) */
+#define MEAS_Y     6    /* Y6 bus (reserved for measurement) */
 #define MEAS_T     13   /* T13 -> DVM CH2 */
 #define MEAS_DVM_CH 2
 
