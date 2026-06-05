@@ -9,8 +9,8 @@
 #include "std_usart.h"
 #include "std_i2c.h"
 #include "std_spi.h"
-//#include "std_capture.h"
-//#include "std_pwm.h"
+#include "std_capture.h"
+#include "std_pwm.h"
 //#include "std_adc.h"
 //#include "std_dac.h"
 #include "ntc.h"
@@ -42,13 +42,13 @@ extern UART_HandleTypeDef huart2;
 extern DMA_HandleTypeDef hdma_usart1_rx;
 extern DMA_HandleTypeDef hdma_usart1_tx;
 
-//extern TIM_HandleTypeDef htim2;		// CAPTURE1/2
-//extern TIM_HandleTypeDef htim3;		// CAPTURE3/4
+extern TIM_HandleTypeDef htim2;		// CAPTURE1/2
+extern TIM_HandleTypeDef htim3;		// CAPTURE3/4
 //extern TIM_HandleTypeDef htim6;		// DAC
-//extern TIM_HandleTypeDef htim11;	// PWM1
+extern TIM_HandleTypeDef htim11;	// PWM1
 ////extern TIM_HandleTypeDef htim12;	// PWM2/3
-//extern TIM_HandleTypeDef htim13;	// PWM4
-//extern TIM_HandleTypeDef htim14;	// PWM5
+extern TIM_HandleTypeDef htim13;	// PWM4
+extern TIM_HandleTypeDef htim14;	// PWM5
 
 //extern ADC_HandleTypeDef hadc1;		// HW : ADC1_CH8/CH9
 //extern DMA_HandleTypeDef hdma_dac1;
@@ -65,8 +65,8 @@ uint8_t scmd_buff[1024];
 gpio_class led = GPIOM_NEW(E, 0, GPIO_MODE_OUTPUT_PP);
 
 
-//extern capture_class capture_list[];
-//extern uint16_t cap_list_qty;
+extern capture_class capture_list[];
+extern uint16_t cap_list_qty;
 
 //adc_class adc_list[] =
 //{
@@ -80,15 +80,15 @@ gpio_class led = GPIOM_NEW(E, 0, GPIO_MODE_OUTPUT_PP);
 //};
 //uint16_t dac_list_qty = (sizeof(dac_list)/sizeof(dac_list[0]));
 //
-//pwm_class pwm_list[] =
-//{
-//		{	.channel = pwm_channel_1, .tim = &htim11,	},
-////		{	.channel = pwm_channel_1, .tim = &htim12,	},
-////		{	.channel = pwm_channel_2, .tim = &htim12,	},
-//		{	.channel = pwm_channel_1, .tim = &htim13,	},
-//		{	.channel = pwm_channel_1, .tim = &htim14,	},
-//};
-//uint16_t pwm_list_qty = (sizeof(pwm_list)/sizeof(pwm_list[0]));
+pwm_class pwm_list[] =
+{
+		{	.channel = pwm_channel_1, .tim = &htim11,	},
+//		{	.channel = pwm_channel_1, .tim = &htim12,	},
+//		{	.channel = pwm_channel_2, .tim = &htim12,	},
+		{	.channel = pwm_channel_1, .tim = &htim13,	},
+		{	.channel = pwm_channel_1, .tim = &htim14,	},
+};
+uint16_t pwm_list_qty = (sizeof(pwm_list)/sizeof(pwm_list[0]));
 
 i2c_bus_class i2c_bus_list[] =
 {

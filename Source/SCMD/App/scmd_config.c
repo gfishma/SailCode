@@ -8,10 +8,10 @@
 #include "scmd_io.h"
 #include "scmd_i2c.h"
 #include "scmd_spi.h"
-////#include "scmd_adc.h"
-////#include "scmd_dac.h"
-//#include "scmd_pwm.h"
-//#include "scmd_capture.h"
+//#include "scmd_adc.h"
+//#include "scmd_dac.h"
+#include "scmd_pwm.h"
+#include "scmd_capture.h"
 
 #include "scmd_dvm.h"
 #include "scmd_w25qxx.h"
@@ -35,8 +35,8 @@ scmd_cmd_def scmd_list[] =
 		{.func = scmd_spi,		.name = "spi",		.dest = ">spi help",		.isVisible = 1,},
 /*		{.func = scmd_adc,		.name = "adc",		.dest = ">adc help",		.isVisible = 1,},*/
 /*		{.func = scmd_dac,		.name = "dac",		.dest = ">dac help",		.isVisible = 1,},*/
-//		{.func = scmd_pwm,		.name = "pwm",		.dest = ">pwm help",		.isVisible = 1,},
-//		{.func = scmd_capture,	.name = "capture",	.dest = ">capture help",	.isVisible = 1,},
+		{.func = scmd_pwm,		.name = "pwm",		.dest = ">pwm help",		.isVisible = 1,},
+		{.func = scmd_capture,	.name = "capture",	.dest = ">capture help",	.isVisible = 1,},
 		{.func = scmd_dvm,		.name = "dvm",		.dest = ">dvm help",		.isVisible = 1,},
 		{.func = scmd_switch,	.name = "switch",	.dest = ">switch help",		.isVisible = 1,},
 		{.func = scmd_emio,		.name = "em_io",	.dest = ">em_io help",		.isVisible = 1,},
