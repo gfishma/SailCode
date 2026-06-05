@@ -122,28 +122,62 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 {
 	scmd_ctrler.msgSource = scmd_ctrl.msgSource;
 	unsigned short slen = 0;
+	unsigned char i;
 
-	slen += sprintf(scmd_msgBuf + slen, "<switch info:\n");
-	slen += sprintf(scmd_msgBuf + slen, "\t initialized : %s\n",
-		(sm_instance.input_mux.i2c.bus != NULL) ? "yes" : "no");
+	slen += sprintf(scmd_msgBuf + slen, "<switch info:\r\n");
 
-	if (sm_instance.input_mux.i2c.bus != NULL)
+	if (sm_instance.input_mux.i2c.bus == NULL)
 	{
-		slen += sprintf(scmd_msgBuf + slen, "\t input bus   : %s\n",
-			sm_instance.input_mux.i2c.bus->info.name);
-		slen += sprintf(scmd_msgBuf + slen, "\t input mux   : 0x%02X\n",
-			sm_instance.input_mux.i2c.addr);
-		slen += sprintf(scmd_msgBuf + slen, "\t input chips : %d\n",
-			sm_instance.input_chip_count);
-		slen += sprintf(scmd_msgBuf + slen, "\t output bus  : %s\n",
-			sm_instance.output_mux.i2c.bus->info.name);
-		slen += sprintf(scmd_msgBuf + slen, "\t output mux  : 0x%02X\n",
-			sm_instance.output_mux.i2c.addr);
-		slen += sprintf(scmd_msgBuf + slen, "\t output chips: %d\n",
+		slen += sprintf(scmd_msgBuf + slen, "  (not configured)\r\n");
+		scmd_callback(scmd_msgBuf, slen);
+		return scmd_normal;
+	}
+
+	/* ---- Input Side ---- */
+	slen += sprintf(scmd_msgBuf + slen, "  Input  Side: %-4s  PCA9847 0x%02X  %d chips\r\n",
+		sm_instance.input_mux.i2c.bus->info.name,
+		sm_instance.input_mux.addr,
+		sm_instance.input_chip_count);
+
+	/* count chips per mux channel */
+	{
+		unsigned char in_ch_cnt[8] = {0};
+		unsigned char ch;
+		for (i = 0; i < sm_instance.input_chip_count; i++)
+			in_ch_cnt[sm_instance.input_chip_mux_ch[i]]++;
+		for (ch = 0; ch < 8; ch++)
+		{
+			if (in_ch_cnt[ch] == 0) continue;
+			slen += sprintf(scmd_msgBuf + slen,
+				"    CH%d: 0x%02X..0x%02X   %d chips\r\n",
+				ch,
+				0x70 | (unsigned char)(0),
+				/* last chip on this channel: find its id */
+				0x70 | (unsigned char)((in_ch_cnt[ch] - 1) % 8),
+				in_ch_cnt[ch]);
+		}
+	}
+
+	/* ---- Output Side ---- */
+	slen += sprintf(scmd_msgBuf + slen, "  Output Side: %-4s  PCA9847 0x%02X  %d chips\r\n",
+		sm_instance.output_mux.i2c.bus->info.name,
+		sm_instance.output_mux.addr,
+		sm_instance.output_chip_count);
+
+	/* output chips: all on same mux channel */
+	if (sm_instance.output_chip_count > 0)
+	{
+		unsigned char och = sm_instance.output_chip_mux_ch[0];
+		slen += sprintf(scmd_msgBuf + slen,
+			"    CH%d: 0x%02X..0x%02X   %d chips\r\n",
+			och,
+			0x70,
+			0x70 | (unsigned char)(sm_instance.output_chip_count - 1),
 			sm_instance.output_chip_count);
 	}
 
-	slen += sprintf(scmd_msgBuf + slen, "\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  Y6 reserved for measurement\r\n");
+
 	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
