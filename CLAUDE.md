@@ -103,6 +103,38 @@ The SCMD engine (`Source/SCMD/Core/scmd.h`) is a text-based command parser inspi
 - **Multi-source**: commands can come from UART (source=1) or TCP sockets (source=2-9)
 - **Callback**: `scmd_callback()` in `app.c` routes responses back to the originating source
 
+### SCMD Command Pattern (add this to new commands)
+
+```c
+// 1. Forward-declare all sub-command functions
+static scmd_errCode_def __help(char *pData, unsigned short len);
+static scmd_errCode_def __info(char *pData, unsigned short len);
+
+// 2. Register sub-commands in scmd_func[] table (used by __scmd_help for display)
+static scmd_cmd_def scmd_func[] = {
+    {.func = __help, .name = "help", .dest = ">em_xxx help",           .isVisible = 1,},
+    {.func = __info, .name = "info", .dest = ">em_xxx info",           .isVisible = 1,},
+    {.func = __info, .name = "cmd",  .dest = ">em_xxx cmd(params) ...", .isVisible = 1,},
+};
+
+// 3. Controller struct
+static scmd_class scmd_ctrler = {
+    .cmdList = scmd_func, .cmdQty = (sizeof(scmd_func)/sizeof(scmd_func[0])),
+    .stringLenthMax = 32, .sfunc_flag = 1,
+};
+
+// 4. __help uses __scmd_help for standard display format
+static scmd_errCode_def __help(char *pData, unsigned short len) {
+    scmd_ctrler.msgSource = scmd_ctrl.msgSource;
+    __scmd_help(&scmd_ctrler, pData, len);
+    return scmd_normal;
+}
+```
+
+- New commands registered in `scmd_config.c`: `{.func = scmd_em_xxx, .name = "em_xxx", .dest = ">em_xxx help", .isVisible = 1,}`
+- Top-level entry takes `pData, len`, strips space with `pData += 1`, dispatches via `scmd_analyze`
+- Help output uses standard format: `scmd list:` with numbered entries showing name and dest
+
 SCMD app modules (`Source/SCMD/App/`) each expose a specific hardware subsystem as SCMD commands:
 - `scmd_dvm` — precision voltage measurement (ADS124S0x)
 - `scmd_dac` / `scmd_adc` — DAC/ADC control (excluded from build)
