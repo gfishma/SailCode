@@ -12,8 +12,6 @@
 extern scmd_class scmd_ctrl;
 extern M_DVM_V2_Def DVM_V2;
 
-extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
-
 #define DMM_Y       6
 #define DMM_T       13
 #define DMM_DVM_CH  2
@@ -49,11 +47,7 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 
 	/* check for sub-command */
 	if (strncmp(pData, "help", 4) == 0)
-	{
-		dmm_ctrler.msgSource = scmd_ctrl.msgSource;
-		__scmd_help(&dmm_ctrler, pData, len);
-		return scmd_normal;
-	}
+		return __help(pData, len);
 	if (strncmp(pData, "info", 4) == 0)
 		return __info(pData, len);
 
@@ -112,8 +106,12 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 
 static scmd_errCode_def __help(char *pData, unsigned short len)
 {
+	unsigned short slen = 0;
 	dmm_ctrler.msgSource = scmd_ctrl.msgSource;
-	__scmd_help(&dmm_ctrler, pData, len);
+	slen += sprintf(scmd_msgBuf + slen, "<em_dmm help:\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  Usage: >em_dmm(Xn)  X:1-300  range:0~10V\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  >em_dmm info\r\n");
+	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
 
