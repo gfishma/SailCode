@@ -23,10 +23,12 @@ static switch_matrix_class* sm = NULL;
 void scmd_dmm_set_switch_matrix(switch_matrix_class* p) { sm = p; }
 
 static scmd_errCode_def __help(char *pData, unsigned short len);
+static scmd_errCode_def __info(char *pData, unsigned short len);
 
 static scmd_cmd_def dmm_func[] =
 {
 	{.func = __help, .name = "help", .dest = ">em_dmm help", .isVisible = 1,},
+	{.func = __info, .name = "info", .dest = ">em_dmm info", .isVisible = 1,},
 };
 
 static scmd_class dmm_ctrler =
@@ -52,6 +54,8 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 		__scmd_help(&dmm_ctrler, pData, len);
 		return scmd_normal;
 	}
+	if (strncmp(pData, "info", 4) == 0)
+		return __info(pData, len);
 
 	pEnd = strstr(pNet, ")");
 	if (pEnd == NULL)
@@ -110,5 +114,16 @@ static scmd_errCode_def __help(char *pData, unsigned short len)
 {
 	dmm_ctrler.msgSource = scmd_ctrl.msgSource;
 	__scmd_help(&dmm_ctrler, pData, len);
+	return scmd_normal;
+}
+
+static scmd_errCode_def __info(char *pData, unsigned short len)
+{
+	unsigned short slen = 0;
+	slen += sprintf(scmd_msgBuf + slen, "<em_dmm info:\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  Measure X channel voltage via Y6->T13->DVM CH2\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  Range: 0~10V (limited by switch matrix supply)\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  X: 1-300\r\n");
+	scmd_callback(scmd_msgBuf, slen);
 	return scmd_normal;
 }
