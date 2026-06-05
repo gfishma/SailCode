@@ -12,6 +12,8 @@
 extern scmd_class scmd_ctrl;
 extern M_DVM_V2_Def DVM_V2;
 
+extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
+
 #define DMM_Y       6
 #define DMM_T       13
 #define DMM_DVM_CH  2
@@ -25,8 +27,9 @@ static scmd_errCode_def __info(char *pData, unsigned short len);
 
 static scmd_cmd_def dmm_func[] =
 {
-	{.func = __help, .name = "help", .dest = ">em_dmm help", .isVisible = 1,},
-	{.func = __info, .name = "info", .dest = ">em_dmm info", .isVisible = 1,},
+	{.func = __help,   .name = "help",   .dest = ">em_dmm help",                                .isVisible = 1,},
+	{.func = __info,   .name = "info",   .dest = ">em_dmm info",                                .isVisible = 1,},
+	{.func = __info,   .name = "meas",   .dest = ">em_dmm(Xn)  X:1-300  range:0~10V",           .isVisible = 1,},
 };
 
 static scmd_class dmm_ctrler =
@@ -106,12 +109,8 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 
 static scmd_errCode_def __help(char *pData, unsigned short len)
 {
-	unsigned short slen = 0;
 	dmm_ctrler.msgSource = scmd_ctrl.msgSource;
-	slen += sprintf(scmd_msgBuf + slen, "<em_dmm help:\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  Usage: >em_dmm(Xn)  X:1-300  range:0~10V\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  >em_dmm info\r\n");
-	scmd_callback(scmd_msgBuf, slen);
+	__scmd_help(&dmm_ctrler, pData, len);
 	return scmd_normal;
 }
 
