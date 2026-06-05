@@ -3,9 +3,9 @@
  *
  * DAC5667 serial command handler
  * Command format:
- *   dac5667 cvs set(V, 2.5)    -- normal 0~5V
- *   dac5667 cvs set(A, 10.0)   -- amplified 0~35V
- *   dac5667 cvs set(N, 3.0)    -- negative 0~-5V
+ *   dac5667 cvs set(LP, 2.5)    -- normal 0~5V
+ *   dac5667 cvs set(HP, 10.0)   -- amplified 0~35V
+ *   dac5667 cvs set(NP, 3.0)    -- negative 0~-5V
  *   dac5667 ccs set(1.5)   -- CCS current (mA, sign=polarity)
  *   dac5667 ccs read       -- CCS current readback
  *   dac5667 info           -- show configuration
@@ -35,7 +35,7 @@ static scmd_cmd_def scmd_func[] =
 {
 	{.func = __help, .name = "help", .dest = ">dac5667 help",                                       .isVisible = 1,},
 	{.func = __info, .name = "info", .dest = ">dac5667 info",                                       .isVisible = 1,},
-	{.func = __cvs,  .name = "cvs",  .dest = ">dac5667 cvs set(V/A/N, voltage)  V:0-5V A:0-35V N:0~-5V", .isVisible = 1,},
+	{.func = __cvs,  .name = "cvs",  .dest = ">dac5667 cvs set(LP/HP/NP, voltage)  LP:0-5V HP:0-35V NP:0~-5V", .isVisible = 1,},
 	{.func = __ccs,  .name = "ccs",  .dest = ">dac5667 ccs set(current_mA) / ccs read",                 .isVisible = 1,},
 };
 
@@ -78,9 +78,9 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 	slen += sprintf(scmd_msgBuf + slen, "<dac5667 info:\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  AD5667RBRMZ-1 on I2C2 PCA9847 CH2, addr 0x0F\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  DAC B output, internal 2.5V ref, 16-bit\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  V (normal):    0~5V   IO7=0 IO33=0\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  A (amplified): 0~35V  IO7=1 IO33=0\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  N (negative):  0~-5V  IO7=0 IO33=1\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  LP (normal):    0~5V   IO7=0 IO33=0\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  HP (amplified): 0~35V  IO7=1 IO33=0\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  NP (negative):  0~-5V  IO7=0 IO33=1\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  DAC A -> CCS via IO1-IO5, I=VDAC/R\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  IO5=MUX_EN IO4/3=MUX_A1/A0(S1=pos S2=neg) IO2/1=range\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  Range: 00=100R(50mA) 01=499R(10mA) 10=10K(0.5mA) 11=1M(5uA)\r\n");
@@ -98,11 +98,11 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
 	return scmd_normal;
 }
 
-static dac5667_path_def parse_mode(char c)
+static dac5667_path_def parse_mode(const char* s)
 {
-	if (c == 'V' || c == 'v') return DAC5667_PATH_NORMAL;
-	if (c == 'A' || c == 'a') return DAC5667_PATH_AMPLIFIED;
-	if (c == 'N' || c == 'n') return DAC5667_PATH_NEGATIVE;
+	if ((s[0] == 'L' || s[0] == 'l') && (s[1] == 'P' || s[1] == 'p')) return DAC5667_PATH_NORMAL;
+	if ((s[0] == 'H' || s[0] == 'h') && (s[1] == 'P' || s[1] == 'p')) return DAC5667_PATH_AMPLIFIED;
+	if ((s[0] == 'N' || s[0] == 'n') && (s[1] == 'P' || s[1] == 'p')) return DAC5667_PATH_NEGATIVE;
 	return (dac5667_path_def)(-1);
 }
 
@@ -110,9 +110,9 @@ static const char* mode_name(dac5667_path_def path)
 {
 	switch (path)
 	{
-	case DAC5667_PATH_NORMAL:    return "V";
-	case DAC5667_PATH_AMPLIFIED: return "A";
-	case DAC5667_PATH_NEGATIVE:  return "N";
+	case DAC5667_PATH_NORMAL:    return "LP";
+	case DAC5667_PATH_AMPLIFIED: return "HP";
+	case DAC5667_PATH_NEGATIVE:  return "NP";
 	default:                     return "?";
 	}
 }
@@ -157,10 +157,10 @@ static scmd_errCode_def __cvs_set(char *pData, unsigned short len)
 	if (*pNet == '\0' || pNet >= pEnd)
 		return __scmd_ErrMsg("<dac5667 cvs set(error), mode not found.\r\n");
 
-	mode = parse_mode(*pNet);
+	mode = parse_mode(pNet);
 	if ((int)mode < 0)
-		return __scmd_ErrMsg("<dac5667 cvs set(error), invalid mode, use V/A/N.\r\n");
-	pNet += 1;
+		return __scmd_ErrMsg("<dac5667 cvs set(error), invalid mode, use LP/HP/NP.\r\n");
+	pNet += 2;
 
 	/* skip ',' */
 	pComma = (char*)strstr(pNet, ",");
