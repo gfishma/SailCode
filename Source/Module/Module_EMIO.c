@@ -1,12 +1,41 @@
 /*
  * Module_EMIO.c
  *
- * CAT9555 IO Expander module (6 chips, 96 IOs)
+ * CAT9555 IO Expander module — per-chip configurable bus/mux/addr
  */
 
 #include "Module_EMIO.h"
 
 extern i2c_bus_class i2c_bus_list[];
+
+void emio_set_default_config(emio_class* self)
+{
+	unsigned char i;
+
+	for (i = 0; i < EMIO_CHIP_COUNT; i++)
+	{
+		if (i < 3)
+		{
+			self->chip_bus[i] = &i2c_bus_list[1];  /* I2C2 */
+			self->chip_mux[i] = 6;                   /* CH7 */
+		}
+		else
+		{
+			self->chip_bus[i] = &i2c_bus_list[0];  /* I2C1 */
+			self->chip_mux[i] = 0;                   /* CH1 */
+		}
+		self->chip[i].id = (unsigned char)(i % 3);
+	}
+}
+
+/* select PCA9847 channel for a given chip index */
+static int emio_select_chip(emio_class* self, unsigned char chip_idx)
+{
+	if (self->chip_bus[chip_idx] == self->mux_i2c1.i2c.bus)
+		return pca9847_select_channel(&self->mux_i2c1, self->chip_mux[chip_idx]);
+	else
+		return pca9847_select_channel(&self->mux_i2c2, self->chip_mux[chip_idx]);
+}
 
 int emio_init(emio_class* self)
 {
@@ -22,24 +51,16 @@ int emio_init(emio_class* self)
 	self->mux_i2c1.i2c.addr_wide = i2c_8bit_mode;
 	self->mux_i2c1.addr = 0x59;
 
+	emio_set_default_config(self);
+
 	for (i = 0; i < EMIO_CHIP_COUNT; i++)
 	{
 		self->chip[i].i2c.addr_wide = i2c_8bit_mode;
-		self->chip[i].i2c.addr = (cat9555_fixed_id | (unsigned char)(i % 3));
+		self->chip[i].i2c.addr = (cat9555_fixed_id | self->chip[i].id);
+		self->chip[i].i2c.bus = self->chip_bus[i];
 		self->chip[i].out_data = 0x0000;
 
-		if (i < 3)
-		{
-			self->chip[i].i2c.bus = &i2c_bus_list[1];
-			self->chip[i].id = (unsigned char)(i % 3);
-			ret = pca9847_select_channel(&self->mux_i2c2, 6);
-		}
-		else
-		{
-			self->chip[i].i2c.bus = &i2c_bus_list[0];
-			self->chip[i].id = (unsigned char)(i % 3);
-			ret = pca9847_select_channel(&self->mux_i2c1, 0);
-		}
+		ret = emio_select_chip(self, i);
 		if (ret != 0)
 		{
 			err_count++;
@@ -53,14 +74,10 @@ int emio_init(emio_class* self)
 		if (ret != 0)
 		{
 			err_count++;
-			if (i < 3)
-				i2c_bus_init(&i2c_bus_list[1]);
-			else
-				i2c_bus_init(&i2c_bus_list[0]);
+			i2c_bus_init(self->chip_bus[i]);
 		}
 	}
 
-	/* disable both mux channels to isolate buses */
 	pca9847_disable_all(&self->mux_i2c1);
 	pca9847_disable_all(&self->mux_i2c2);
 
@@ -82,10 +99,7 @@ int emio_reset(emio_class* self)
 
 	for (i = 0; i < EMIO_CHIP_COUNT; i++)
 	{
-		if (i < 3)
-			ret = pca9847_select_channel(&self->mux_i2c2, 6);
-		else
-			ret = pca9847_select_channel(&self->mux_i2c1, 0);
+		ret = emio_select_chip(self, i);
 		if (ret != 0)
 			continue;
 
@@ -115,11 +129,7 @@ int emio_set_io(emio_class* self, unsigned char io_num, unsigned char level)
 	chip_idx = io_num / EMIO_IO_PER_CHIP;
 	pin = io_num % EMIO_IO_PER_CHIP;
 
-	/* select PCA9847 channel */
-	if (chip_idx < 3)
-		ret = pca9847_select_channel(&self->mux_i2c2, 6);
-	else
-		ret = pca9847_select_channel(&self->mux_i2c1, 0);
+	ret = emio_select_chip(self, chip_idx);
 	if (ret != 0) return -3;
 
 	return cat9555_set_pin(&self->chip[chip_idx], pin, level);
@@ -140,10 +150,7 @@ int emio_read_io(emio_class* self, unsigned char io_num, unsigned char* pLevel)
 	chip_idx = io_num / EMIO_IO_PER_CHIP;
 	pin = io_num % EMIO_IO_PER_CHIP;
 
-	if (chip_idx < 3)
-		ret = pca9847_select_channel(&self->mux_i2c2, 6);
-	else
-		ret = pca9847_select_channel(&self->mux_i2c1, 0);
+	ret = emio_select_chip(self, chip_idx);
 	if (ret != 0) return -3;
 
 	return cat9555_read_pin(&self->chip[chip_idx], pin, pLevel);
