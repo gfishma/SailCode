@@ -60,7 +60,7 @@ scmd_class scmd_ctrl =
 	//    .funcQty = (sizeof(funcList)/sizeof(funcList[0])),
 	.stringLenthMax = 32,
 	// information
-	.version = "SailCode Program V3.0.1",
+	.version = "SailCode Program V3.1.0",
 	// .author = "zhiwei.zhong",
 	.date = "2026/06/05",
 };

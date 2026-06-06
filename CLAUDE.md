@@ -191,10 +191,11 @@ Key facts established during V3.0 development — new sessions should consult th
 - **EMIO chips 1-48 (chips 0-2) locked** for internal use, 49-96 (chips 3-5) user-configurable via `em_io config`.
 - **I2C buses** are now init'd once in `bsp_init()` before all modules.
 - **SCMD** buffer size: scmd_msgBuf 2048, scmd_buff 1024 (watch RAM limit ~128KB).
-- **RAM state**: ~98.3% used (~2.5KB free). Disabled ADC/DAC (SCMD + StdPort) from build. PWM/Capture are ACTIVE and must stay.
+- **RAM state**: ~44% used (~74KB free). FreeRTOS heap (64KB) moved to CCMRAM via `configAPPLICATION_ALLOCATED_HEAP=1` + custom `ucHeap` in `os.c` with `__attribute__((section(".ccmram")))`. CCMRAM is 64KB at 0x10000000 — CPU-only, zero-wait, no DMA access. Main SRAM (128KB) now has plenty of headroom. Disabled ADC/DAC (SCMD + StdPort) from build. PWM/Capture are ACTIVE.
 - **Command naming**: `em_cvs` (constant voltage) / `em_ccs` (constant current) — separate top-level commands, not sub-commands of dac5667. File: `scmd_em_cvs_ccs.c`. Modes: LP(0-5V), HP(0-35V), NP(0~-5V). Parameters with units: `em_cvs set(LP, 2.5V)`, `em_ccs set(10mA)`.
 - **`switch meas`** uses `Dvm_V2_Rang25V` range (not Dvm_V2_Auto). DVM global instance must be init'd.
 - **PD module**: `pd cal` (CH3) and `pd test` (CH8) — two separate HUSB238 instances. HUSB238 negotiation: write SRC_PDO(0x08) then GO_COMMAND(0x09, 0x01). PDO encoding is non-linear: 5V=0x10,9V=0x20,12V=0x30,15V=0x80,18V=0x90,20V=0xA0.
+- **DVM CH1** (high voltage): 0-25V range with 1/6 divider → actual = raw × 6. CVS HP measurement via IO6/7/20/34/87=1. PD_CAL measurement via IO22/87=1. Both use `>dvm get(dvm_0, 1)`.
 - **Serial tools**: `tools/serial_monitor.py` for quick command testing via COM4. `tools/serial_mcp.py` is an MCP server (may not be loaded).
 - **Permissions**: project `.claude/settings.json` has allowlist for build/flash/git/serial. `python -c *` deliberately NOT allowlisted (arbitrary exec risk).
 
