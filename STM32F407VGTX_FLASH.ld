@@ -154,6 +154,15 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM
 
+  /* FreeRTOS heap in CCMRAM — saves ~70KB in main SRAM */
+  .ccmram (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.ccmram)
+    *(.ccmram*)
+    . = ALIGN(4);
+  } >CCMRAM
+
   /* User_heap_stack section, used to check that there is enough "RAM" Ram  type memory left */
   ._user_heap_stack :
   {

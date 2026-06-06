@@ -17,6 +17,8 @@ extern gpio_class led;
 extern scmd_class scmd_ctrl;
 extern usart_class usart_1;
 
+/* FreeRTOS heap placed in CCMRAM to free main SRAM (~70KB) */
+uint8_t ucHeap[ configTOTAL_HEAP_SIZE ] __attribute__((section(".ccmram")));
 void vStart_thread(void *argument);
 void vSCMD_thread(void *argument);
 void vTCP_Server_Thread(void *argument);
