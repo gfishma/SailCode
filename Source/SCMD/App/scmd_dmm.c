@@ -30,7 +30,7 @@ extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
 /* relay channel measurement */
 #define HIGH_CURR_Y        8
 #define HIGH_VOLT_Y        7
-#define HIGH_CURR_CH_COUNT 14
+#define HIGH_CURR_CH_COUNT 15
 #define HIGH_VOLT_CH_COUNT 28
 
 /* path control IOs */
@@ -47,7 +47,7 @@ void scmd_dmm_set_switch_matrix(switch_matrix_class* p) { sm = p; }
 
 static const unsigned char high_curr_ch_io[HIGH_CURR_CH_COUNT] = {
     57, 58, 59, 60, 61, 62, 63, 64,   /* CH1-8 */
-    89, 90, 91, 92, 93, 94            /* CH9-14 */
+    89, 90, 91, 92, 93, 94, 95        /* CH9-15 */
 };
 
 static const unsigned char high_volt_ch_row[HIGH_VOLT_CH_COUNT] = {
@@ -68,11 +68,8 @@ static int check_high_curr_ch(unsigned char ch)
     unsigned char on_count = 0;
     unsigned char target_on = 0;
 
-    /* IO95 (CH_OFF) must be 0 when a channel is selected */
-    emio_read_io(&emio_instance, 95, &lv);
-    if (lv != 0) return -4;  /* CH_OFF active */
-
     /* check all channel IOs: exactly one should be on, matching ch */
+    /* all-0 = OFF (no channel selected) */
     for (i = 0; i < HIGH_CURR_CH_COUNT; i++)
     {
         emio_read_io(&emio_instance, high_curr_ch_io[i], &lv);
@@ -82,7 +79,7 @@ static int check_high_curr_ch(unsigned char ch)
         }
     }
 
-    if (on_count == 0)   return -5;  /* no channel selected */
+    if (on_count == 0)   return -5;  /* no channel selected (OFF) */
     if (on_count > 1)    return -6;  /* multiple channels selected */
     if (!target_on)      return -7;  /* wrong channel selected */
 
@@ -125,7 +122,7 @@ static int check_high_volt_ch(unsigned char ch)
 /* ---- measurement functions (read IO state → determine DVM channel) ---- */
 
 /*
- * HIGH_CURR_CH topology:
+ * HIGH_CURR_CH topology (15ch, one-hot: IO57-64 CH1-8, IO89-95 CH9-15, all-0=OFF):
  *   IO79=1, IO87=0, IO77=x → LV: Y8 → yf set(Y8,T13) → DVM CH2
  *   IO79=0, IO87=1, IO77=0 → HV: DVM CH1 (1/6 divider)
  */
@@ -325,12 +322,12 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
             if (p == NULL)
                 return __scmd_ErrMsg("<em_dmm(error), HIGH_CURR_CH number not found.\r\n");
             if (ch_val < 1 || ch_val > HIGH_CURR_CH_COUNT)
-                return __scmd_ErrMsg("<em_dmm(error), HIGH_CURR_CH over range (1-14).\r\n");
+                return __scmd_ErrMsg("<em_dmm(error), HIGH_CURR_CH over range (1-15).\r\n");
 
             ret = meas_high_curr_ch((unsigned char)ch_val, &voltage);
             if (ret == -4) {
                 slen += sprintf(scmd_msgBuf + slen,
-                    "<em_dmm(error) HIGH_CURR_CH IO95=1 (CH_OFF), set ch IO first\r\n");
+                    "<em_dmm(error) HIGH_CURR_CH unexpected\r\n");
                 scmd_callback(scmd_msgBuf, slen);
                 return scmd_normal;
             }
@@ -485,7 +482,7 @@ static scmd_errCode_def __info(char *pData, unsigned short len)
     unsigned short slen = 0;
     slen += sprintf(scmd_msgBuf + slen, "<em_dmm info:\r\n");
     slen += sprintf(scmd_msgBuf + slen, "  Xn             — X:1-300, route X->Y6->T13->DVM CH2\r\n");
-    slen += sprintf(scmd_msgBuf + slen, "  HIGH_CURR_CHn  — n:1-14, set ch IOs first. IO79=1→LV(Y8→DVM CH2) IO79=0,87=1,77=0→HV(DVM CH1)\r\n");
+    slen += sprintf(scmd_msgBuf + slen, "  HIGH_CURR_CHn  — n:1-15, set ch IOs first. IO79=1→LV(Y8→DVM CH2) IO79=0,87=1,77=0→HV(DVM CH1)\r\n");
     slen += sprintf(scmd_msgBuf + slen, "  HIGH_VOLT_CHn  — n:1-28, set ch IOs first. IO78=1→LV(Y7→DVM CH2) IO78=0,87=0,77=0→HV(DVM CH1)\r\n");
     scmd_callback(scmd_msgBuf, slen);
     return scmd_normal;
