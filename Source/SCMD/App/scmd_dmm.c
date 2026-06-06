@@ -43,6 +43,85 @@ static switch_matrix_class* sm = NULL;
 
 void scmd_dmm_set_switch_matrix(switch_matrix_class* p) { sm = p; }
 
+/* ---- channel IO definitions (one-hot, user sets before measurement) ---- */
+
+static const unsigned char high_curr_ch_io[HIGH_CURR_CH_COUNT] = {
+    57, 58, 59, 60, 61, 62, 63, 64,   /* CH1-8 */
+    89, 90, 91, 92, 93, 94            /* CH9-14 */
+};
+
+static const unsigned char high_volt_ch_row[HIGH_VOLT_CH_COUNT] = {
+    65, 65, 66, 66, 67, 67, 68, 68, 69, 69, 70, 70, 71, 71,
+    52, 52, 53, 53, 54, 54, 55, 55, 56, 56, 85, 85, 86, 86
+};
+static const unsigned char high_volt_ch_io72[HIGH_VOLT_CH_COUNT] = {
+    0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+    0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1
+};
+
+/* ---- channel IO validation ---- */
+
+static int check_high_curr_ch(unsigned char ch)
+{
+    unsigned char lv;
+    unsigned char i;
+    unsigned char on_count = 0;
+    unsigned char target_on = 0;
+
+    /* IO95 (CH_OFF) must be 0 when a channel is selected */
+    emio_read_io(&emio_instance, 95, &lv);
+    if (lv != 0) return -4;  /* CH_OFF active */
+
+    /* check all channel IOs: exactly one should be on, matching ch */
+    for (i = 0; i < HIGH_CURR_CH_COUNT; i++)
+    {
+        emio_read_io(&emio_instance, high_curr_ch_io[i], &lv);
+        if (lv) {
+            on_count++;
+            if (i + 1 == ch) target_on = 1;
+        }
+    }
+
+    if (on_count == 0)   return -5;  /* no channel selected */
+    if (on_count > 1)    return -6;  /* multiple channels selected */
+    if (!target_on)      return -7;  /* wrong channel selected */
+
+    return 0;
+}
+
+static int check_high_volt_ch(unsigned char ch)
+{
+    /* unique row IOs: 65-71, 52-56, 85-86 */
+    static const unsigned char row_ios[] = {
+        65,66,67,68,69,70,71, 52,53,54,55,56, 85,86
+    };
+    unsigned char lv;
+    unsigned char i;
+    unsigned char on_count = 0;
+    unsigned char target_row = high_volt_ch_row[ch - 1];
+    unsigned char target_io72 = high_volt_ch_io72[ch - 1];
+    unsigned char found_target = 0;
+
+    for (i = 0; i < sizeof(row_ios); i++)
+    {
+        emio_read_io(&emio_instance, row_ios[i], &lv);
+        if (lv) {
+            on_count++;
+            if (row_ios[i] == target_row) found_target = 1;
+        }
+    }
+
+    if (on_count == 0)   return -5;  /* no channel selected */
+    if (on_count > 1)    return -6;  /* multiple channels selected */
+    if (!found_target)   return -7;  /* wrong row IO selected */
+
+    /* verify IO72 matches the target channel */
+    emio_read_io(&emio_instance, 72, &lv);
+    if (lv != target_io72) return -8;  /* IO72 mismatch */
+
+    return 0;
+}
+
 /* ---- measurement functions (read IO state → determine DVM channel) ---- */
 
 /*
@@ -55,7 +134,9 @@ static int meas_high_curr_ch(unsigned char ch, float* pVoltage)
     int ret;
     unsigned char io79 = 0, io87 = 0, io77 = 0;
 
-    (void)ch; /* channel IO already set by user */
+    /* verify channel IO state */
+    ret = check_high_curr_ch(ch);
+    if (ret != 0) return ret;
 
     emio_read_io(&emio_instance, IO_PATH_79, &io79);
     emio_read_io(&emio_instance, IO_PATH_87, &io87);
@@ -99,7 +180,9 @@ static int meas_high_volt_ch(unsigned char ch, float* pVoltage)
     int ret;
     unsigned char io78 = 0, io87 = 0, io77 = 0;
 
-    (void)ch; /* channel IO already set by user */
+    /* verify channel IO state */
+    ret = check_high_volt_ch(ch);
+    if (ret != 0) return ret;
 
     emio_read_io(&emio_instance, IO_PATH_78, &io78);
     emio_read_io(&emio_instance, IO_PATH_87, &io87);
@@ -245,6 +328,30 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
                 return __scmd_ErrMsg("<em_dmm(error), HIGH_CURR_CH over range (1-14).\r\n");
 
             ret = meas_high_curr_ch((unsigned char)ch_val, &voltage);
+            if (ret == -4) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH IO95=1 (CH_OFF), set ch IO first\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -5) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH no channel selected (all IO=0)\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -6) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH multiple channels selected\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -7) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH wrong channel selected\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
             if (ret == -1) {
                 slen += sprintf(scmd_msgBuf + slen,
                     "<em_dmm(error) HIGH_CURR_CH IO state unknown (LV/HV?)\r\n");
@@ -297,6 +404,36 @@ scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
                 return __scmd_ErrMsg("<em_dmm(error), HIGH_VOLT_CH over range (1-28).\r\n");
 
             ret = meas_high_volt_ch((unsigned char)ch_val, &voltage);
+            if (ret == -4) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH IO95=1 (unexpected for VOLT)\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -5) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH no channel selected (all row IO=0)\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -6) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH multiple channels selected\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -7) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH wrong channel selected\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -8) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH IO72 mismatch for this ch\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
             if (ret == -1) {
                 slen += sprintf(scmd_msgBuf + slen,
                     "<em_dmm(error) HIGH_VOLT_CH IO state unknown (LV/HV?)\r\n");
