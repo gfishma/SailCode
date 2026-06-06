@@ -1,126 +1,419 @@
 /*
  * scmd_dmm.c
  *
- * em_dmm(Xn) — route Xn→Y6→T13, read DVM CH2, disconnect.
- * X range: 1-300.
+ * em_dmm — voltage measurement via switch matrix or relay input channels
+ *   em_dmm(Xn)                  — route Xn→Y6→T13, read DVM CH2
+ *   em_dmm(HIGH_CURR_CHn)       — select relay ch, auto LV/HV via IO79
+ *   em_dmm(HIGH_VOLT_CHn)       — select relay ch, auto LV/HV via IO78
+ *   LV path: Y→T13→DVM CH2 (needs switch matrix). HV path: DVM CH1 (1/6 divider).
  */
 
 #include "scmd_dmm.h"
 #include "Module_SwitchMatrix.h"
 #include "Module_DVM_V2.h"
+#include "scmd_emio.h"
 
 extern scmd_class scmd_ctrl;
 extern M_DVM_V2_Def DVM_V2;
 
 extern int __scmd_help(scmd_class* pCmd, char* pData, unsigned short len);
 
-#define DMM_Y       6
-#define DMM_T       13
-#define DMM_DVM_CH  2
+/* existing X→Y6→T13 measurement */
+#define DMM_Y              6
+#define DMM_T              13
+#define DMM_DVM_CH         2
+
+/* high voltage path (DVM CH1, external 1/6 divider) */
+#define DMM_CH1            1
+#define DMM_CH1_DIVIDER    6.0f
+
+/* relay channel measurement */
+#define HIGH_CURR_Y        8
+#define HIGH_VOLT_Y        7
+#define HIGH_CURR_CH_COUNT 14
+#define HIGH_VOLT_CH_COUNT 28
+
+/* path control IOs */
+#define IO_PATH_77         77
+#define IO_PATH_78         78
+#define IO_PATH_79         79
+#define IO_PATH_87         87
+
+/* ---- HIGH_CURR_CH IO mapping (one-hot: IO57-64 CH1-8, IO89-94 CH9-14, IO95=OFF) ---- */
+static const unsigned char high_curr_ch_io[HIGH_CURR_CH_COUNT] = {
+    57, 58, 59, 60, 61, 62, 63, 64,   /* CH1-8 */
+    89, 90, 91, 92, 93, 94            /* CH9-14 */
+};
+
+static const unsigned char high_curr_all_ios[] = {
+    57, 58, 59, 60, 61, 62, 63, 64,
+    89, 90, 91, 92, 93, 94, 95
+};
+#define HIGH_CURR_ALL_COUNT  (sizeof(high_curr_all_ios) / sizeof(high_curr_all_ios[0]))
+
+/* ---- HIGH_VOLT_CH IO mapping (row IO + IO72 column, 28 channels) ---- */
+static const unsigned char high_volt_ch_row[HIGH_VOLT_CH_COUNT] = {
+    65, 65, 66, 66, 67, 67, 68, 68, 69, 69, 70, 70, 71, 71,
+    52, 52, 53, 53, 54, 54, 55, 55, 56, 56, 85, 85, 86, 86
+};
+static const unsigned char high_volt_ch_io72[HIGH_VOLT_CH_COUNT] = {
+    0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+    0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1
+};
+
+static const unsigned char high_volt_all_ios[] = {
+    65, 66, 67, 68, 69, 70, 71,
+    52, 53, 54, 55, 56,
+    85, 86,
+    72
+};
+#define HIGH_VOLT_ALL_COUNT  (sizeof(high_volt_all_ios) / sizeof(high_volt_all_ios[0]))
 
 static switch_matrix_class* sm = NULL;
 
 void scmd_dmm_set_switch_matrix(switch_matrix_class* p) { sm = p; }
+
+/* ---- helpers ---- */
+
+static void high_curr_all_off(void)
+{
+    unsigned char i;
+    /* set all channel IOs to 0 */
+    for (i = 0; i < HIGH_CURR_ALL_COUNT - 1; i++)
+        emio_set_io(&emio_instance, high_curr_all_ios[i], 0);
+    /* IO95 = 1 (CH_OFF) */
+    emio_set_io(&emio_instance, 95, 1);
+}
+
+static int high_curr_select_ch(unsigned char ch)
+{
+    if (ch < 1 || ch > HIGH_CURR_CH_COUNT) return -1;
+    high_curr_all_off();
+    /* IO95 = 0 to enable channel select */
+    emio_set_io(&emio_instance, 95, 0);
+    return emio_set_io(&emio_instance, high_curr_ch_io[ch - 1], 1);
+}
+
+static void high_volt_all_off(void)
+{
+    unsigned char i;
+    for (i = 0; i < HIGH_VOLT_ALL_COUNT; i++)
+        emio_set_io(&emio_instance, high_volt_all_ios[i], 0);
+}
+
+static int high_volt_select_ch(unsigned char ch)
+{
+    int ret;
+    if (ch < 1 || ch > HIGH_VOLT_CH_COUNT) return -1;
+    high_volt_all_off();
+    ret = emio_set_io(&emio_instance, high_volt_ch_row[ch - 1], 1);
+    if (ret != 0) return ret;
+    return emio_set_io(&emio_instance, 72, high_volt_ch_io72[ch - 1]);
+}
+
+/* ---- measurement functions (read IO state → determine DVM channel) ---- */
+
+/*
+ * HIGH_CURR_CH topology:
+ *   IO79=1, IO87=0, IO77=x → LV: Y8 → yf set(Y8,T13) → DVM CH2
+ *   IO79=0, IO87=1, IO77=0 → HV: DVM CH1 (1/6 divider)
+ */
+static int meas_high_curr_ch(unsigned char ch, float* pVoltage)
+{
+    int ret;
+    unsigned char io79 = 0, io87 = 0, io77 = 0;
+
+    ret = high_curr_select_ch(ch);
+    if (ret != 0) return -1;
+
+    emio_read_io(&emio_instance, IO_PATH_79, &io79);
+    emio_read_io(&emio_instance, IO_PATH_87, &io87);
+    emio_read_io(&emio_instance, IO_PATH_77, &io77);
+
+    if (io79 == 0 && io87 == 1 && io77 == 0)
+    {
+        /* HV: DVM CH1 (external 1/6 divider) */
+        ret = (int)DVM_V2_GetVolt(&DVM_V2, DMM_CH1,
+            Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, pVoltage);
+        *pVoltage = *pVoltage * DMM_CH1_DIVIDER;
+    }
+    else if (io79 == 1)
+    {
+        /* LV: route Y8→T13→DVM CH2 */
+        if (sm == NULL) { high_curr_all_off(); return -3; }
+
+        ret = switch_matrix_connect_yf(sm, HIGH_CURR_Y, DMM_T, 1);
+        if (ret != 0) { high_curr_all_off(); return -2; }
+
+        ret = (int)DVM_V2_GetVolt(&DVM_V2, DMM_DVM_CH,
+            Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, pVoltage);
+
+        switch_matrix_connect_yf(sm, HIGH_CURR_Y, DMM_T, 0);
+    }
+
+    high_curr_all_off();
+    return ret;
+}
+
+/*
+ * HIGH_VOLT_CH topology:
+ *   IO78=1, IO87=0, IO77=x → LV: Y7 → yf set(Y7,T13) → DVM CH2
+ *   IO78=0, IO87=0, IO77=0 → HV: DVM CH1 (1/6 divider)
+ */
+static int meas_high_volt_ch(unsigned char ch, float* pVoltage)
+{
+    int ret;
+    unsigned char io78 = 0, io87 = 0, io77 = 0;
+
+    ret = high_volt_select_ch(ch);
+    if (ret != 0) return -1;
+
+    emio_read_io(&emio_instance, IO_PATH_78, &io78);
+    emio_read_io(&emio_instance, IO_PATH_87, &io87);
+    emio_read_io(&emio_instance, IO_PATH_77, &io77);
+
+    if (io78 == 0 && io87 == 0 && io77 == 0)
+    {
+        /* HV: DVM CH1 (external 1/6 divider) */
+        ret = (int)DVM_V2_GetVolt(&DVM_V2, DMM_CH1,
+            Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, pVoltage);
+        *pVoltage = *pVoltage * DMM_CH1_DIVIDER;
+    }
+    else if (io78 == 1)
+    {
+        /* LV: route Y7→T13→DVM CH2 */
+        if (sm == NULL) { high_volt_all_off(); return -3; }
+
+        ret = switch_matrix_connect_yf(sm, HIGH_VOLT_Y, DMM_T, 1);
+        if (ret != 0) { high_volt_all_off(); return -2; }
+
+        ret = (int)DVM_V2_GetVolt(&DVM_V2, DMM_DVM_CH,
+            Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, pVoltage);
+
+        switch_matrix_connect_yf(sm, HIGH_VOLT_Y, DMM_T, 0);
+    }
+
+    high_volt_all_off();
+    return ret;
+}
+
+/* ---- SCMD table ---- */
 
 static scmd_errCode_def __help(char *pData, unsigned short len);
 static scmd_errCode_def __info(char *pData, unsigned short len);
 
 static scmd_cmd_def dmm_func[] =
 {
-	{.func = __help,   .name = "help",   .dest = ">em_dmm help",                                .isVisible = 1,},
-	{.func = __info,   .name = "info",   .dest = ">em_dmm info",                                .isVisible = 1,},
-	{.func = __info,   .name = "meas",   .dest = ">em_dmm(Xn)  X:1-300  range:0~10V",           .isVisible = 1,},
+    {.func = __help, .name = "help", .dest = ">em_dmm help",                                      .isVisible = 1,},
+    {.func = __info, .name = "info", .dest = ">em_dmm info",                                      .isVisible = 1,},
+    {.func = __info, .name = "meas", .dest = ">em_dmm(Xn|HIGH_CURR_CHn|HIGH_VOLT_CHn)  path auto-detect via IO78/79", .isVisible = 1,},
 };
 
 static scmd_class dmm_ctrler =
 {
-	.cmdList = dmm_func, .cmdQty = (sizeof(dmm_func)/sizeof(dmm_func[0])),
-	.stringLenthMax = 32, .sfunc_flag = 1,
+    .cmdList = dmm_func, .cmdQty = (sizeof(dmm_func) / sizeof(dmm_func[0])),
+    .stringLenthMax = 32, .sfunc_flag = 1,
 };
+
+/* ---- entry ---- */
 
 scmd_errCode_def scmd_em_dmm(char* pData, unsigned short len)
 {
-	char *pNet = pData, *pEnd;
-	unsigned short slen = 0;
-	long x_val;
-	float voltage;
-	int ret;
+    char *pNet = pData, *pEnd;
+    unsigned short slen = 0;
+    long ch_val;
+    float voltage;
+    int ret;
 
-	str_deSpace(pData);
+    str_deSpace(pData);
 
-	/* check for sub-command */
-	if (strncmp(pData, "help", 4) == 0)
-		return __help(pData, len);
-	if (strncmp(pData, "info", 4) == 0)
-		return __info(pData, len);
+    /* sub-commands */
+    if (strncmp(pData, "help", 4) == 0)
+        return __help(pData, len);
+    if (strncmp(pData, "info", 4) == 0)
+        return __info(pData, len);
 
-	pEnd = strstr(pNet, ")");
-	if (pEnd == NULL)
-		return __scmd_ErrMsg("<em_dmm(error), ')' not found.\r\n");
-	pNet = strstr(pNet, "(");
-	if (pNet == NULL)
-		return __scmd_ErrMsg("<em_dmm(error), '(' not found.\r\n");
-	pNet += 1; str_deSpace(pNet);
+    pEnd = strstr(pNet, ")");
+    if (pEnd == NULL)
+        return __scmd_ErrMsg("<em_dmm(error), ')' not found.\r\n");
+    pNet = strstr(pNet, "(");
+    if (pNet == NULL)
+        return __scmd_ErrMsg("<em_dmm(error), '(' not found.\r\n");
+    pNet += 1; str_deSpace(pNet);
 
-	if (*pNet != 'X' && *pNet != 'x')
-		return __scmd_ErrMsg("<em_dmm(error), expected 'X' prefix.\r\n");
-	pNet++;
+    /* ---- Xn path ---- */
+    if (*pNet == 'X' || *pNet == 'x')
+    {
+        pNet++;
+        pNet = str_GetHexDec(pNet, pEnd, &ch_val);
+        if (pNet == NULL)
+            return __scmd_ErrMsg("<em_dmm(error), X value not found.\r\n");
+        if (ch_val < 1 || ch_val > SM_INPUT_TOTAL)
+            return __scmd_ErrMsg("<em_dmm(error), X over range (1-300).\r\n");
 
-	pNet = str_GetHexDec(pNet, pEnd, &x_val);
-	if (pNet == NULL)
-		return __scmd_ErrMsg("<em_dmm(error), X value not found.\r\n");
-	if (x_val < 1 || x_val > SM_INPUT_TOTAL)
-		return __scmd_ErrMsg("<em_dmm(error), X over range (1-300).\r\n");
+        if (sm == NULL)
+            return __scmd_ErrMsg("<em_dmm(error), switch matrix not initialized.\r\n");
 
-	if (sm == NULL)
-		return __scmd_ErrMsg("<em_dmm(error), switch matrix not initialized.\r\n");
+        ret = switch_matrix_connect(sm, (unsigned short)ch_val, DMM_Y, DMM_T, 1);
+        if (ret != 0) {
+            slen += sprintf(scmd_msgBuf + slen,
+                "<em_dmm(error) connect failed code=%d\r\n", ret);
+            scmd_callback(scmd_msgBuf, slen);
+            return scmd_normal;
+        }
 
-	/* connect X -> Y6 -> T13 */
-	ret = switch_matrix_connect(sm, (unsigned short)x_val, DMM_Y, DMM_T, 1);
-	if (ret != 0) {
-		slen += sprintf(scmd_msgBuf + slen,
-			"<em_dmm(error) connect failed code=%d\r\n", ret);
-		scmd_callback(scmd_msgBuf, slen);
-		return scmd_normal;
-	}
+        ret = (int)DVM_V2_GetVolt(&DVM_V2, DMM_DVM_CH,
+            Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, &voltage);
 
-	/* read DVM */
-	ret = (int)DVM_V2_GetVolt(&DVM_V2, DMM_DVM_CH,
-		Dvm_V2_Rang25V, Dvm_V2_Smp_Time_100MS, &voltage);
+        switch_matrix_connect(sm, (unsigned short)ch_val, DMM_Y, DMM_T, 0);
 
-	/* disconnect */
-	switch_matrix_connect(sm, (unsigned short)x_val, DMM_Y, DMM_T, 0);
+        if (ret != 0) {
+            slen += sprintf(scmd_msgBuf + slen,
+                "<em_dmm(error) dvm read failed code=%d\r\n", ret);
+            scmd_callback(scmd_msgBuf, slen);
+            return scmd_normal;
+        }
 
-	if (ret != 0) {
-		slen += sprintf(scmd_msgBuf + slen,
-			"<em_dmm(error) dvm read failed code=%d\r\n", ret);
-		scmd_callback(scmd_msgBuf, slen);
-		return scmd_normal;
-	}
+        {
+            int mv = (int)(voltage * 1000.0f);
+            slen += sprintf(scmd_msgBuf + slen,
+                "<em_dmm(ok) X%d %dmV\r\n", (int)ch_val, mv);
+        }
+        scmd_callback(scmd_msgBuf, slen);
+        return scmd_normal;
+    }
 
-	{
-		int mv = (int)(voltage * 1000.0f);
-		slen += sprintf(scmd_msgBuf + slen,
-			"<em_dmm(ok) X%d %dmV\r\n", (int)x_val, mv);
-	}
-	scmd_callback(scmd_msgBuf, slen);
-	return scmd_normal;
+    /* ---- HIGH_CURR_CHn / HIGH_VOLT_CHn path ---- */
+    if (*pNet == 'H' || *pNet == 'h')
+    {
+        /* skip "HIGH" */
+        char *p = pNet + 4;
+        if (*p == '_') p++;
+
+        /* HIGH_CURR_CHn */
+        if ((p[0] == 'C' || p[0] == 'c') &&
+            (p[1] == 'U' || p[1] == 'u') &&
+            (p[2] == 'R' || p[2] == 'r') &&
+            (p[3] == 'R' || p[3] == 'r'))
+        {
+            p += 4;
+            /* skip optional "_CH" */
+            if (*p == '_') p++;
+            if (*p == 'C' || *p == 'c') p++;
+            if (*p == 'H' || *p == 'h') p++;
+
+            p = str_GetHexDec(p, pEnd, &ch_val);
+            if (p == NULL)
+                return __scmd_ErrMsg("<em_dmm(error), HIGH_CURR_CH number not found.\r\n");
+            if (ch_val < 1 || ch_val > HIGH_CURR_CH_COUNT)
+                return __scmd_ErrMsg("<em_dmm(error), HIGH_CURR_CH over range (1-14).\r\n");
+
+            ret = meas_high_curr_ch((unsigned char)ch_val, &voltage);
+            if (ret == -1) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH select failed\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -2) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH yf connect failed\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -3) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_CURR_CH LV path needs switch matrix\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret != 0) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) dvm read failed code=%d\r\n", ret);
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            {
+                int mv = (int)(voltage * 1000.0f);
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(ok) HIGH_CURR_CH%d %dmV\r\n", (int)ch_val, mv);
+            }
+            scmd_callback(scmd_msgBuf, slen);
+            return scmd_normal;
+        }
+
+        /* HIGH_VOLT_CHn */
+        if ((p[0] == 'V' || p[0] == 'v') &&
+            (p[1] == 'O' || p[1] == 'o') &&
+            (p[2] == 'L' || p[2] == 'l') &&
+            (p[3] == 'T' || p[3] == 't'))
+        {
+            p += 4;
+            /* skip optional "_CH" */
+            if (*p == '_') p++;
+            if (*p == 'C' || *p == 'c') p++;
+            if (*p == 'H' || *p == 'h') p++;
+
+            p = str_GetHexDec(p, pEnd, &ch_val);
+            if (p == NULL)
+                return __scmd_ErrMsg("<em_dmm(error), HIGH_VOLT_CH number not found.\r\n");
+            if (ch_val < 1 || ch_val > HIGH_VOLT_CH_COUNT)
+                return __scmd_ErrMsg("<em_dmm(error), HIGH_VOLT_CH over range (1-28).\r\n");
+
+            ret = meas_high_volt_ch((unsigned char)ch_val, &voltage);
+            if (ret == -1) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH select failed\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -2) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH yf connect failed\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret == -3) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) HIGH_VOLT_CH LV path needs switch matrix\r\n");
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            if (ret != 0) {
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(error) dvm read failed code=%d\r\n", ret);
+                scmd_callback(scmd_msgBuf, slen);
+                return scmd_normal;
+            }
+            {
+                int mv = (int)(voltage * 1000.0f);
+                slen += sprintf(scmd_msgBuf + slen,
+                    "<em_dmm(ok) HIGH_VOLT_CH%d %dmV\r\n", (int)ch_val, mv);
+            }
+            scmd_callback(scmd_msgBuf, slen);
+            return scmd_normal;
+        }
+    }
+
+    return __scmd_ErrMsg("<em_dmm(error), unknown format. Use Xn, HIGH_CURR_CHn, or HIGH_VOLT_CHn.\r\n");
 }
+
+/* ---- help / info ---- */
 
 static scmd_errCode_def __help(char *pData, unsigned short len)
 {
-	dmm_ctrler.msgSource = scmd_ctrl.msgSource;
-	__scmd_help(&dmm_ctrler, pData, len);
-	return scmd_normal;
+    dmm_ctrler.msgSource = scmd_ctrl.msgSource;
+    __scmd_help(&dmm_ctrler, pData, len);
+    return scmd_normal;
 }
 
 static scmd_errCode_def __info(char *pData, unsigned short len)
 {
-	unsigned short slen = 0;
-	slen += sprintf(scmd_msgBuf + slen, "<em_dmm info:\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  Measure X channel voltage via Y6->T13->DVM CH2\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  Range: 0~10V (limited by switch matrix supply)\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  X: 1-300\r\n");
-	scmd_callback(scmd_msgBuf, slen);
-	return scmd_normal;
+    unsigned short slen = 0;
+    slen += sprintf(scmd_msgBuf + slen, "<em_dmm info:\r\n");
+    slen += sprintf(scmd_msgBuf + slen, "  Xn             — X:1-300, route X->Y6->T13->DVM CH2\r\n");
+    slen += sprintf(scmd_msgBuf + slen, "  HIGH_CURR_CHn  — n:1-14, IO79=1→Y8→DVM CH2  IO79=0,87=1,77=0→DVM CH1\r\n");
+    slen += sprintf(scmd_msgBuf + slen, "  HIGH_VOLT_CHn  — n:1-28, IO78=1→Y7→DVM CH2  IO78=0,87=0,77=0→DVM CH1\r\n");
+    scmd_callback(scmd_msgBuf, slen);
+    return scmd_normal;
 }
