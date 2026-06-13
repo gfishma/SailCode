@@ -57,7 +57,7 @@ typedef enum
 
 typedef enum
 {
-	DAC5667_CCS_RANGE_100R = 0,    /* IO2=0 IO1=0, max 50mA   */
+	DAC5667_CCS_RANGE_100R = 0,    /* IO2=0 IO1=0, max 10mA (op-amp limit) */
 	DAC5667_CCS_RANGE_499R = 1,    /* IO2=0 IO1=1, max ~10mA  */
 	DAC5667_CCS_RANGE_10K  = 2,    /* IO2=1 IO1=0, max 0.5mA  */
 	DAC5667_CCS_RANGE_1M   = 3,    /* IO2=1 IO1=1, max 5μA    */

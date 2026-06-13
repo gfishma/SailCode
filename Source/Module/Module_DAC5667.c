@@ -153,6 +153,10 @@ int dac5667_set_current(dac5667_module_class* self, float current_ma)
 
 	i_abs = (current_ma < 0.0f) ? -current_ma : current_ma;
 
+	/* CCS op-amp limit: max 10mA */
+	if (i_abs > 10.0f)
+		return -4;
+
 	/* auto-select range: highest R where |I| * R <= 5.0V */
 	range = DAC5667_CCS_RANGE_1M;
 	for (i = 3; i >= 0; i--)

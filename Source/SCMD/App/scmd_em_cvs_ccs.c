@@ -165,7 +165,7 @@ static scmd_cmd_def ccs_func[] =
 {
 	{.func = __ccs_help, .name = "help", .dest = ">em_ccs help",                                        .isVisible = 1,},
 	{.func = __ccs_info, .name = "info", .dest = ">em_ccs info",                                        .isVisible = 1,},
-	{.func = __ccs_set,  .name = "set",  .dest = ">em_ccs set(x.xxmA)  sign=polarity, auto range",        .isVisible = 1,},
+	{.func = __ccs_set,  .name = "set",  .dest = ">em_ccs set(x.xxmA)  max 10mA, auto range",              .isVisible = 1,},
 	{.func = __ccs_read, .name = "read", .dest = ">em_ccs read   readback via DVM CH4",                .isVisible = 1,},
 };
 
@@ -198,7 +198,7 @@ static scmd_errCode_def __ccs_info(char *pData, unsigned short len)
 	slen += sprintf(scmd_msgBuf + slen, "<em_ccs info:\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  AD5667 DAC A -> CCS  I=VDAC/R\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  IO5=MUX_EN IO4/3=MUX_A1/A0(S1=pos S2=neg) IO2/1=range\r\n");
-	slen += sprintf(scmd_msgBuf + slen, "  Range: 00=100R(50mA) 01=499R(10mA) 10=10K(0.5mA) 11=1M(5uA)\r\n");
+	slen += sprintf(scmd_msgBuf + slen, "  Range: 00=100R(10mA) 01=499R(10mA) 10=10K(0.5mA) 11=1M(5uA)\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  DVM CH4 for current readback\r\n");
 	slen += sprintf(scmd_msgBuf + slen, "  IO1-5 (chip %d): %s CH%d 0x%02X\r\n",
 		c0, (emio_instance.chip_bus[c0]==&i2c_bus_list[0])?"I2C1":"I2C2",
@@ -224,6 +224,12 @@ static scmd_errCode_def __ccs_set(char *pData, unsigned short len)
 	current_ma = (float)strtod(pNet, NULL);
 
 	ret = dac5667_set_current(&dac5667_module, current_ma);
+	if (ret == -4)
+	{
+		slen += sprintf(scmd_msgBuf + slen, "<em_ccs set(error) max 10mA (op-amp limit)\r\n");
+		scmd_callback(scmd_msgBuf, slen);
+		return scmd_normal;
+	}
 	if (ret != 0)
 	{
 		slen += sprintf(scmd_msgBuf + slen, "<em_ccs set(error) code=%d\r\n", ret);
