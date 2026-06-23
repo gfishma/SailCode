@@ -27,6 +27,8 @@
 #define RESET_H() AD9910_PIN_RESET_PORT->BSRR = AD9910_PIN_RESET_PIN
 #define RESET_L() AD9910_PIN_RESET_PORT->BSRR = (uint32_t)AD9910_PIN_RESET_PIN << 16
 #define SDIO_READ() ((AD9910_PIN_SDIO_PORT->IDR & AD9910_PIN_SDIO_PIN) ? 1 : 0)
+#define SDIO_IN()  do { AD9910_PIN_SDIO_PORT->MODER &= ~(3UL << (10*2)); } while(0)
+#define SDIO_OUT() do { AD9910_PIN_SDIO_PORT->MODER = (AD9910_PIN_SDIO_PORT->MODER & ~(3UL<<(10*2))) | (1UL<<(10*2)); } while(0)
 
 /* ---- Private state ---- */
 static uint32_t g_sysclk_hz = 1000000000;  /* REFCLK(25MHz) × PLL_N(40) */
@@ -94,8 +96,11 @@ static uint32_t spi_read32(uint8_t addr)
     /* instruction: R/W=1 + address */
     spi_transfer_byte((uint8_t)(0x80 | (addr & 0x7F)));
 
+    /* switch SDIO to input for readback */
+    SDIO_IN();
     for (i = 0; i < 4; i++)
         val = (val << 8) | spi_transfer_byte(0x00);
+    SDIO_OUT();
 
     CS_H();
     return val;
@@ -139,16 +144,22 @@ int ad9910_init(void)
     SDIO_H();
     CS_H();
     UPDATE_L();
-    RESET_H();
+    RESET_L();  /* AD9910 reset active HIGH, idle LOW */
 
-    /* Hardware reset */
-    ad9910_reset();
+    /* Hardware reset pulse */
+    RESET_H(); HAL_Delay(1);
+    RESET_L(); HAL_Delay(1);
 
-    /* Read back CFR1 to verify communication */
+    /* Write CFR1=0x00 (stay 4-wire), verify CFR2 non-zero */
     {
-        uint32_t cfr1_default = spi_read32(AD9910_REG_CFR1);
-        if (cfr1_default == 0x00000000)
-            return -1;  /* no response */
+        uint8_t b[4] = {0,0,0,0};
+        spi_write(AD9910_REG_CFR1, b, 4);
+        io_update();
+    }
+    {
+        uint32_t cfr2 = spi_read32(AD9910_REG_CFR2);
+        if (cfr2 == 0x00000000)
+            return -1;
     }
 
     return 0;
@@ -156,10 +167,8 @@ int ad9910_init(void)
 
 void ad9910_reset(void)
 {
-    RESET_L();
-    HAL_Delay(1);
-    RESET_H();
-    HAL_Delay(1);
+    RESET_H(); HAL_Delay(1);
+    RESET_L(); HAL_Delay(1);
 }
 
 int ad9910_set_pll(uint8_t n)
