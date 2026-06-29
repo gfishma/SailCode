@@ -50,7 +50,7 @@
 #define AD9910_CFR3_ICP_387uA   (7UL << 12)
 
 /* ---- CFR1 bits ---- */
-#define AD9910_CFR1_SDIO_ONLY   (1UL << 1)    /* 1=SDIO input-only (3-wire), 0=bidirectional */
+#define AD9910_CFR1_SDIO_ONLY   (1UL << 7)    /* 3-wire SPI mode */
 #define AD9910_CFR1_SINC_DIS    (1UL << 1)    /* Disable inverse sinc filter */
 #define AD9910_CFR1_DAC_PD      (1UL << 12)   /* DAC power-down */
 

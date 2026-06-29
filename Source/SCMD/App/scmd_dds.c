@@ -48,20 +48,6 @@ void scmd_dds_init_default(void)
 
     /* default PLL: 25MHz × 40 = 1GHz SysClk */
     ad9910_set_pll(40);
-
-    /* configure and enable output */
-    ad9910_set_freq(1000);
-    ad9910_comp_enable(1);
-
-    /* verify */
-    {
-        uint32_t c1, c2, c3;
-        ad9910_read_reg(0x00, &c1);
-        ad9910_read_reg(0x01, &c2);
-        ad9910_read_reg(0x02, &c3);
-        printf("<dds init CFR1=0x%08lX CFR2=0x%08lX CFR3=0x%08lX\r\n", c1, c2, c3);
-    }
-    printf("<dds init(ok) 1kHz square wave ready\r\n");
 }
 
 scmd_errCode_def scmd_dds(char* pData, unsigned short len)
