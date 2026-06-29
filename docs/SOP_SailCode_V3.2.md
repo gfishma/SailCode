@@ -54,42 +54,82 @@
 
 ### 2.3 测量路径说明
 
-**X 通道测量**：固定路径 X→Y6→T13→DVM CH2
+> **重要：X 通道和 HIGH_xxx 通道的使用方式不同！**
 
-**HIGH_CURR_CH 测量**：通过读 IO 状态自动选择 LV/HV 路径
+#### X 通道（直接测量，无需任何配置）
 
-| 路径 | IO 条件 | 信号流向 |
-|------|---------|----------|
-| **LV** (低压) | IO79=1, IO87=0, IO77=x | →Y8→T13→DVM CH2 |
-| **HV** (高压) | IO79=0, IO87=1, IO77=0 | →DVM CH1 (1/6 分压, ×6) |
+X1~X300 的测量路径是固定的：`X→Y6→T13→DVM CH2`。不需要任何 IO 配置，直接发指令即可：
 
-**HIGH_VOLT_CH 测量**：通过读 IO 状态自动选择 LV/HV 路径
+```
+>em_dmm(X1)
+<em_dmm(ok) X1 2495mV
+```
 
-| 路径 | IO 条件 | 信号流向 |
-|------|---------|----------|
-| **LV** (低压) | IO78=1, IO87=0, IO77=x | →Y7→T13→DVM CH2 |
-| **HV** (高压) | IO78=0, IO87=0, IO77=0 | →DVM CH1 (1/6 分压, ×6) |
+#### HIGH_CURR_CH / HIGH_VOLT_CH（需要预先配置信号路径）
 
-> **注意**：HV 测量时，HIGH_CURR 和 HIGH_VOLT 共享 IO87/IO77，不能同时使用两个通道的 HV 模式。
+与 X 不同，HIGH_CURR_CH 和 HIGH_VOLT_CH 是**继电器选通的输入通道**，信号需要通过 IO 配置才能到达 DVM。`em_dmm` 命令**只读 IO 状态判断路径，不主动切换 IO**。
+
+**三种使用场景：**
+
+| 场景 | 前置条件 | 指令 | 说明 |
+|------|---------|------|------|
+| **1. 已切换到普通输出 (T1-48)** | 通道通过矩阵连到了 Y 总线 | `em_dmm(HIGH_CURR_CHn)` | LV 路径，等同于 X 测量 |
+| **2. 已切换到 DVM_MES_HIGH** | IO 配置为 HV 路径 | `em_dmm(HIGH_CURR_CHn)` | HV 路径，DVM CH1 测量 |
+| **3. 未配置（默认/不满足 1 或 2）** | — | 报错或读数异常 | 需先手动配 IO 再测量 |
+
+**LV/HV 自动判定逻辑：**
+
+`em_dmm` 通过读取以下 IO 状态判定走哪条路：
+
+| 通道类型 | LV 路径 (→Y→T13→DVM CH2) | HV 路径 (→DVM CH1, ×6) |
+|---------|--------------------------|------------------------|
+| HIGH_CURR_CH | IO79=1, IO87=0 (IO77 不在意) | IO79=0, IO87=1, **IO77=0** |
+| HIGH_VOLT_CH | IO78=1, IO87=0 (IO77 不在意) | IO78=0, IO87=0, **IO77=0** |
+
+> **三个 IO 条件必须全部满足才走 HV 路径**，否则走 LV 路径。IO87 和 IO77 在 HIGH_CURR 和 HIGH_VOLT 之间共享——两者不能同时使用 HV 模式。
+
+**场景 1 详解——切换到普通输出 (LV)：**
+
+当 HIGH_CURR_CH 或 HIGH_VOLT_CH 被切换到矩阵输出侧的 **T1-T48** 上时，`em_dmm` 自动识别 LV 路径，内部调用 `switch yf set(Y, T13, ON)` 把信号接到 DVM CH2。
+
+```
+步骤 1: 用继电器把通道信号路由到 Y 总线
+步骤 2: em_dmm(HIGH_CURR_CHn)  →  自动识别 LV → Y→T13→DVM CH2
+```
+
+**场景 2 详解——切换到 DVM_MES_HIGH (HV)：**
+
+当通道被配置为直接连接 DVM CH1 时（三个 IO 条件全部满足），`em_dmm` 走 HV 路径，直接读数 ×6。
+
+```
+步骤 1: em_io set([xx, 路径IO])  →  配好 HV 通路的三个 IO
+步骤 2: em_io set([xx, 通道IO])   →  选通道
+步骤 3: em_dmm(HIGH_CURR_CHn)     →  自动识别 HV → DVM CH1 ×6
+```
+
+> **未配好路径时**：如果 HIGH_CURR_CH/HIGH_VOLT_CH 没有连到 T1-48 也没有切到 DVM_MES_HIGH，`em_dmm` 会报 IO 状态不匹配。
 
 ### 2.4 使用示例
 
 ```
-# 测量交叉开关 X1 的电压
+# === X 通道：直接测 ===
 >em_dmm(X1)
 <em_dmm(ok) X1 2495mV
 
-# 测量 HIGH_CURR_CH1 (先配置通道 IO 和路径 IO)
->em_io set([79,1],[87,0])            -- 设 LV 路径
->em_io set([57,1],[95,0])            -- 选 HIGH_CURR_CH1 (IO57=1)
+# === 场景 1: HIGH_CURR_CH1 已切到矩阵输出 (LV) ===
 >em_dmm(HIGH_CURR_CH1)
 <em_dmm(ok) HIGH_CURR_CH1 3310mV
 
-# HIGH_VOLT_CH1 用 HV 路径 (直接 DVM CH1)
->em_io set([78,0],[87,0],[77,0])     -- 设 HV 路径
->em_io set([65,1],[72,0])            -- 选 HIGH_VOLT_CH1 (IO65=1, IO72=0)
+# === 场景 2: HIGH_VOLT_CH1 切到 DVM_MES_HIGH (HV) ===
+# 先配 HV 三条件
+>em_io set([78,0],[87,0],[77,0])
+>em_io set([65,1],[72,0])            -- 选 HIGH_VOLT_CH1
 >em_dmm(HIGH_VOLT_CH1)
 <em_dmm(ok) HIGH_VOLT_CH1 2508mV
+
+# === 场景 3: 未配路径 → 报错 ===
+>em_dmm(HIGH_CURR_CH1)
+<em_dmm(error) HIGH_CURR_CH IO state unknown (LV/HV?)
 ```
 
 ### 2.5 通道 IO 映射
