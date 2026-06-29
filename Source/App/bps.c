@@ -23,7 +23,6 @@
 #include "scmd_emio.h"
 #include "scmd_em_cvs_ccs.h"
 #include "scmd_pd.h"
-#include "scmd_dds.h"
 #include "w25qxx.h"
 
 #include "Module_DVM_V2.h"
@@ -140,13 +139,13 @@ gpio_class io_list[] =
 		GPIOM_NEW(E, 4, GPIO_MODE_INPUT),
 		GPIOM_NEW(E, 6, GPIO_MODE_INPUT),
 		GPIOM_NEW(E, 7, GPIO_MODE_INPUT),
-//		GPIOM_NEW(E, 8, GPIO_MODE_INPUT),
+		GPIOM_NEW(E, 8, GPIO_MODE_INPUT),
 		GPIOM_NEW(E, 9, GPIO_MODE_OUTPUT_PP),
-//		GPIOM_NEW(E, 10, GPIO_MODE_INPUT),
+		GPIOM_NEW(E, 10, GPIO_MODE_INPUT),
 		GPIOM_NEW(E, 11, GPIO_MODE_INPUT),
-//		GPIOM_NEW(E, 12, GPIO_MODE_INPUT),
+		GPIOM_NEW(E, 12, GPIO_MODE_INPUT),
 		GPIOM_NEW(E, 13, GPIO_MODE_INPUT),
-//		GPIOM_NEW(E, 14, GPIO_MODE_INPUT),
+		GPIOM_NEW(E, 14, GPIO_MODE_INPUT),
 		GPIOM_NEW(E, 15, GPIO_MODE_INPUT),
 };
 uint16_t io_list_qty = (sizeof(io_list)/sizeof(io_list[0]));
@@ -207,7 +206,6 @@ void bsp_init()
 	scmd_emio_init_default();
 	scmd_em_cvs_ccs_init_default();
 	scmd_pd_init_default();
-	scmd_dds_init_default();
 	ntc_init(&ntc_1, 10000, 3976);
 
 	printf("follow the write rabbit.\r\n");

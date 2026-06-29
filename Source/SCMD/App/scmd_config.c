@@ -20,7 +20,6 @@
 #include "scmd_em_cvs_ccs.h"
 #include "scmd_pd.h"
 #include "scmd_dmm.h"
-#include "scmd_dds.h"
 
 extern gpio_class led;
 
@@ -46,7 +45,6 @@ scmd_cmd_def scmd_list[] =
 		{.func = scmd_em_ccs,		.name = "em_ccs",		.dest = ">em_ccs help",		.isVisible = 1,},
 		{.func = scmd_pd,		.name = "pd",		.dest = ">pd help",		.isVisible = 1,},
 		{.func = scmd_em_dmm,		.name = "em_dmm",		.dest = ">em_dmm help",		.isVisible = 1,},
-	{.func = scmd_dds,		.name = "dds",		.dest = ">dds help",		.isVisible = 1,},
 	//		{.func = scmd_w25qxx,	.name = "w25qxx",	.dest = ">w25qxx help",		.isVisible = 1,},
 };
 
